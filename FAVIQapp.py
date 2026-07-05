@@ -5,10 +5,16 @@ import re
 from PIL import Image
 
 # ตั้งค่าหน้า Streamlit
+try:
+    fav_icon = Image.open("images/pageicon.png")
+except FileNotFoundError:
+    fav_icon = "🎬"  # เผื่อไว้ในกรณีที่ระบบออนไลน์หาภาพไม่เจอชั่วคราว ให้ใช้อิโมจิแทนเพื่อไม่ให้เว็บพังครับ
+
+# 2. ตั้งค่าหน้าเว็บโดยใส่รูปไอคอนที่โหลดมา
 st.set_page_config(
     page_title="Artist Video Gallery",
-    page_icon="🎬",
-    layout="wide"  # ปรับเป็นแบบกว้างเพื่อให้แสดงผลหน้าปกคลิปแบบ Grid สวยๆ เหมือน YouTube
+    page_icon=fav_icon,  # ใช้ไฟล์รูปภาพ pageicon.png แทนอิโมจิแล้วครับ ✨
+    layout="wide"        # หน้ากว้างสไตล์ YouTube Grid
 )
 
 DATA_FILE = "artist_schedules.csv"
