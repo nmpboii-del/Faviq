@@ -6,7 +6,7 @@ import requests
 import time
 import datetime
 import base64
-import json  # เพิ่มการโหลด json สำหรับเก็บค่าคอนฟิกหัวข้อ
+import json  # ใช้สำหรับเก็บค่าคอนฟิกหัวข้อและแท็บแบบ Dynamic
 
 # ตั้งค่าหน้า Streamlit
 try:
@@ -27,19 +27,20 @@ INFO_FILE = "important_info.txt"
 MV_FILE = "mv_highlight.csv"
 GIFTS_FILE = "fan_gifts.csv"      
 MESSAGES_FILE = "fan_messages.csv" 
-CONFIG_FILE = "system_config.json"  # ไฟล์ใหม่สำหรับเก็บหัวข้อและหมวดหมู่
+CONFIG_FILE = "system_config.json"  
 
 ADMIN_PASSWORD = "Nittaya_195"
 
 # --- ฟังก์ชันจัดการโครงสร้างหัวข้อ/หมวดหมู่ระบบ ---
 def load_system_config():
+    # กำหนดค่าเริ่มต้นหากยังไม่มีไฟล์ตั้งค่า
     default_config = {
-        "tabs": {
-            "home": "หน้าแรก",
-            "videos": "วิดีโอทั้งหมด",
-            "gifts": "🎨 Digital Goods",
-            "letters": "💌 ส่งข้อความ"
-        },
+        "tabs": [
+            {"id": "home", "title": "หน้าแรก", "type": "home_dashboard", "target": ""},
+            {"id": "tab_all_vids", "title": "วิดีโอทั้งหมด", "type": "all_videos", "target": ""},
+            {"id": "tab_gifts", "title": "🎨 Digital Goods", "type": "digital_goods", "target": ""},
+            {"id": "tab_letters", "title": "💌 ส่งข้อความ", "type": "fan_letters", "target": ""}
+        ],
         "video_shelves": [
             {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
             {"type": "Online Video / YouTube", "title": "🔴 คลิปออนไลน์ / YouTube & Social Media Content"},
@@ -59,7 +60,7 @@ def save_system_config(config_data):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config_data, f, ensure_ascii=False, indent=4)
 
-# โหลดค่าคอนฟิกหัวข้อเข้าสู่ระบบ
+# โหลดค่าคอนฟิกหัวข้อและแท็บเข้าสู่ระบบ
 sys_config = load_system_config()
 
 # --- ฟังก์ชันระบบช่วยดึงข้อมูล ---
@@ -87,13 +88,12 @@ def fetch_youtube_details(url):
     except: pass
     try:
         watch_url = f"https://www.youtube.com/watch?v={video_id}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept-Language": "th-TH,th;q=0.9"}
+        headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "th-TH,th;q=0.9"}
         res = requests.get(watch_url, headers=headers, timeout=5)
         if res.status_code == 200:
             title_match = re.search(r'<title>(.*?)</title>', res.text)
             if title_match: title = title_match.group(1).replace(" - YouTube", "").strip()
-            channel_match = re.search(r'"ownerChannelName":"([^"]+)"', res.text)
-            if not channel_match: channel_match = re.search(r'"author":"([^"]+)"', res.text)
+            channel_match = re.search(r'"ownerChannelName":"([^"]+)"', res.text) or re.search(r'"author":"([^"]+)"', res.text)
             if channel_match: channel = channel_match.group(1).strip()
             date_match = re.search(r'"publishDate":"([^"]+)"', res.text) or re.search(r'"uploadDate":"([^"]+)"', res.text) or re.search(r'<meta itemprop="datePublished" content="([^"]+)"', res.text)
             if date_match:
@@ -108,7 +108,7 @@ def fetch_live_youtube_views(video_id):
     if not video_id: return None
     try:
         url = f"https://www.youtube.com/watch?v={video_id}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
             match = re.search(r'"viewCount":"(\d+)"', response.text)
@@ -269,170 +269,147 @@ if view_mode == "🏠 หน้าแรก":
             st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 เวลาที่อัปเดตล่าสุด(อัปเดตทุก 10 นาที): {update_str} น.</span>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # ดึงหัวข้อแท็บที่ตั้งค่าจากหลังบ้าน
-    tab_labels = sys_config.get("tabs", {})
-    tab_home, tab_videos, tab_gifts, tab_letters = st.tabs([
-        tab_labels.get("home", "หน้าแรก"),
-        tab_labels.get("videos", "วิดีโอทั้งหมด"),
-        tab_labels.get("gifts", "🎨 Digital Goods"),
-        tab_labels.get("letters", "💌 ส่งข้อความ")
-    ])
-    
-    # ---- TAB 1: หน้าแรก ----
-    with tab_home:
-        pinned_vids = [v for v in all_vids if v.get('pinned', False)]
-        if pinned_vids:
-            st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม <span class="yt-play-all">▶ ดูทั้งหมด</span></div>', unsafe_allow_html=True)
-            pv_cols = st.columns(4)
-            for pv_idx, pv_item in enumerate(pinned_vids[:4]):
-                with pv_cols[pv_idx % 4]:
-                    thumb = get_youtube_thumbnail(pv_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
-                    click_url = pv_item['link'] if pv_item['link'] and not pd.isna(pv_item['link']) else "#"
-                    note_html = f'<div style="font-size:12px; color:#f59e0b; font-style:italic; margin-top:2px;">💬 {pv_item["note"]}</div>' if ('note' in pv_item and pv_item['note'] and not pd.isna(pv_item['note'])) else ''
-                    ch_name = pv_item.get('channel', 'Official Channel')
+    # --- ดึงรายชื่อแท็บแบบ Dynamic ตามที่ตั้งค่าจากหลังบ้าน ---
+    defined_tabs = sys_config.get("tabs", [])
+    if not defined_tabs:
+        st.warning("ยังไม่ได้ตั้งค่าแท็บเมนูในระบบหลังบ้าน")
+    else:
+        # สร้างแท็บแบบไดนามิกตามจำนวนในลิสต์
+        tab_objects = st.tabs([t["title"] for t in defined_tabs])
+        
+        for index, tab_info in enumerate(defined_tabs):
+            with tab_objects[index]:
+                t_type = tab_info.get("type")
+                t_target = tab_info.get("target")
+                
+                # ฟังก์ชันแสดงผลตามประเภทเนื้อหาของแท็บนั้นๆ
+                if t_type == "home_dashboard":
+                    # โซนวิดีโอแนะนำปักหมุด
+                    pinned_vids = [v for v in all_vids if v.get('pinned', False)]
+                    if pinned_vids:
+                        st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม</div>', unsafe_allow_html=True)
+                        pv_cols = st.columns(4)
+                        for pv_idx, pv_item in enumerate(pinned_vids[:4]):
+                            with pv_cols[pv_idx % 4]:
+                                thumb = get_youtube_thumbnail(pv_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                                click_url = pv_item['link'] if pv_item['link'] and not pd.isna(pv_item['link']) else "#"
+                                note_html = f'<div style="font-size:12px; color:#f59e0b; font-style:italic; margin-top:2px;">💬 {pv_item["note"]}</div>' if ('note' in pv_item and pv_item['note'] and not pd.isna(pv_item['note'])) else ''
+                                st.markdown(f"""
+                                <a href="{click_url}" target="_blank" class="yt-video-card-link">
+                                    <div class="yt-video-card">
+                                        <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
+                                        <div class="yt-video-details">
+                                            <div class="yt-video-title">📌 {pv_item["title"]}</div>
+                                            <div class="yt-video-channel">👤 {pv_item.get('channel', 'Official Channel')}</div>
+                                            <div class="yt-video-meta">📅 {pv_item["date"]}</div>
+                                            {note_html}
+                                        </div>
+                                    </div>
+                                </a>
+                                """, unsafe_allow_html=True)
                     
-                    st.markdown(f"""
-                    <a href="{click_url}" target="_blank" class="yt-video-card-link">
-                        <div class="yt-video-card">
-                            <div class="yt-thumbnail-container">
-                                <img class="yt-thumbnail-img" src="{thumb}">
-                            </div>
-                            <div class="yt-video-details">
-                                <div class="yt-video-title">📌 {pv_item["title"]}</div>
-                                <div class="yt-video-channel">👤 {ch_name}</div>
-                                <div class="yt-video-meta">📅 {pv_item["date"]} • {pv_item["type"]}</div>
-                                {note_html}
-                            </div>
-                        </div>
-                    </a>
-                    """, unsafe_allow_html=True)
-                    
-        if gifts_list:
-            st.markdown(f'<div class="yt-shelf-title">{tab_labels.get("gifts", "🎨 Digital Goods")}</div>', unsafe_allow_html=True)
-            g_home_cols = st.columns(4)
-            for g_idx, g_item in enumerate(gifts_list[:4]):
-                with g_home_cols[g_idx % 4]:
-                    img_src = g_item['img_url']
-                    if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
-                    pin_badge = '<span style="color:#f59e0b; font-weight:bold;">📌 [แนะนำ]</span> ' if g_item.get('pinned', False) else ''
-                    st.markdown(f"""
-                    <div class="gift-card">
-                        <div class="gift-img-container">
-                            <img class="gift-img" src="{img_src}">
-                        </div>
-                        <div class="video-title" style="text-align:center; font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{pin_badge}{g_item["title"]}</div>
-                        <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # โชว์ 2 หมวดหมู่แรกตัวอย่าง
+                    homepage_shelves = sys_config.get("video_shelves", [])[:2]
+                    for shelf in homepage_shelves:
+                        df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
+                        if not df_shelf.empty:
+                            st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
+                            v_cols = st.columns(4)
+                            for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
+                                with v_cols[v_idx % 4]:
+                                    thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                                    st.markdown(f"""
+                                    <a href="{v_item['link']}" target="_blank" class="yt-video-card-link">
+                                        <div class="yt-video-card">
+                                            <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
+                                            <div class="yt-video-details">
+                                                <div class="yt-video-title">{v_item["title"]}</div>
+                                                <div class="yt-video-meta">📅 {v_item["date"]}</div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                    """, unsafe_allow_html=True)
 
-        if not df_vids.empty:
-            # ดึงเฉพาะ 2 หมวดหมู่แรกไปโชว์ที่หน้าแรก (หรือทั้งหมดตามลิสต์)
-            homepage_shelves = sys_config.get("video_shelves", [])[:2]
-            for shelf in homepage_shelves:
-                df_shelf = df_vids[df_vids['type'] == shelf['type']]
-                if not df_shelf.empty:
-                    st.markdown(f'<div class="yt-shelf-title">{shelf["title"]} <span class="yt-play-all">▶ เล่นทั้งหมด</span></div>', unsafe_allow_html=True)
-                    v_cols = st.columns(4)
-                    for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
-                        with v_cols[v_idx % 4]:
-                            thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
-                            click_url = v_item['link'] if v_item['link'] and not pd.isna(v_item['link']) else "#"
-                            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>' if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])) else ''
-                            ch_name = v_item.get('channel', 'Official Channel')
+                elif t_type == "all_videos":
+                    video_shelves = sys_config.get("video_shelves", [])
+                    for shelf in video_shelves:
+                        st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
+                        df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
+                        if df_shelf.empty:
+                            st.caption("ยังไม่มีวิดีโอในหมวดหมู่นี้")
+                        else:
+                            shelf_records = df_shelf.to_dict('records')
+                            s_key = f"sh_all_{shelf['type'].replace(' ', '_').replace('/', '_')}"
+                            if s_key not in st.session_state: st.session_state[s_key] = False
+                            display_vids = shelf_records if st.session_state[s_key] else shelf_records[:4]
                             
-                            st.markdown(f"""
-                            <a href="{click_url}" target="_blank" class="yt-video-card-link">
-                                <div class="yt-video-card">
-                                    <div class="yt-thumbnail-container">
-                                        <img class="yt-thumbnail-img" src="{thumb}">
+                            v_cols = st.columns(4)
+                            for v_idx, v_item in enumerate(display_vids):
+                                with v_cols[v_idx % 4]:
+                                    thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                                    st.markdown(f"""
+                                    <a href="{v_item['link']}" target="_blank" class="yt-video-card-link">
+                                        <div class="yt-video-card">
+                                            <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
+                                            <div class="yt-video-details">
+                                                <div class="yt-video-title">{v_item["title"]}</div>
+                                                <div class="yt-video-meta">📅 {v_item["date"]}</div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                    """, unsafe_allow_html=True)
+                            if len(shelf_records) > 4:
+                                if st.button("🔽 ดูเพิ่มเติม" if not st.session_state[s_key] else "🔼 ยุบแถว", key=f"btn_{s_key}"):
+                                    st.session_state[s_key] = not st.session_state[s_key]
+                                    st.rerun()
+
+                elif t_type == "single_shelf_only":
+                    # แสดงเฉพาะหมวดหมู่วิดีโอที่เจาะจงเลือกมาตัวเดียว
+                    st.markdown(f'<div class="yt-shelf-title">📂 หมวดหมู่: {t_target}</div>', unsafe_allow_html=True)
+                    df_shelf = df_vids[df_vids['type'] == t_target] if not df_vids.empty else pd.DataFrame()
+                    if df_shelf.empty:
+                        st.caption("ยังไม่มีข้อมูลวิดีโอในหมวดหมู่นี้")
+                    else:
+                        v_cols = st.columns(4)
+                        for v_idx, v_item in enumerate(df_shelf.to_dict('records')):
+                            with v_cols[v_idx % 4]:
+                                thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                                st.markdown(f"""
+                                <a href="{v_item['link']}" target="_blank" class="yt-video-card-link">
+                                    <div class="yt-video-card">
+                                        <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
+                                        <div class="yt-video-details">
+                                            <div class="yt-video-title">{v_item["title"]}</div>
+                                            <div class="yt-video-meta">📅 {v_item["date"]}</div>
+                                        </div>
                                     </div>
-                                    <div class="yt-video-details">
-                                        <div class="yt-video-title">{v_item["title"]}</div>
-                                        <div class="yt-video-channel">👤 {ch_name}</div>
-                                        <div class="yt-video-meta">📅 {v_item["date"]}</div>
-                                        {note_html}
-                                    </div>
+                                </a>
+                                """, unsafe_allow_html=True)
+
+                elif t_type == "digital_goods":
+                    if not gifts_list: st.caption("ขณะนี้ยังไม่มีรูปภาพเปิดให้ดาวน์โหลด")
+                    else:
+                        g_cols = st.columns(4)
+                        for g_idx, g_item in enumerate(gifts_list):
+                            with g_cols[g_idx % 4]:
+                                img_src = g_item['img_url']
+                                if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
+                                st.markdown(f"""
+                                <div class="gift-card">
+                                    <div class="gift-img-container"><img class="gift-img" src="{img_src}"></div>
+                                    <div style="font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{g_item["title"]}</div>
+                                    <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
                                 </div>
-                            </a>
-                            """, unsafe_allow_html=True)
+                                """, unsafe_allow_html=True)
 
-    # ---- TAB 2: วิดีโอทั้งหมด ----
-    with tab_videos:
-        video_shelves = sys_config.get("video_shelves", [])
-        for shelf in video_shelves:
-            st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
-            if df_vids.empty: 
-                st.caption("ยังไม่มีข้อมูลวิดีโอในคลัง")
-            else:
-                df_shelf = df_vids[df_vids['type'] == shelf['type']]
-                if df_shelf.empty: 
-                    st.caption("ยังไม่มีวิดีโอในหมวดหมู่นี้")
-                else:
-                    shelf_records = df_shelf.to_dict('records')
-                    state_key = f"show_all_{shelf['type'].replace(' ', '_').replace('/', '_')}"
-                    if state_key not in st.session_state: st.session_state[state_key] = False
-                    
-                    display_vids = shelf_records if st.session_state[state_key] else shelf_records[:4]
-                    v_cols = st.columns(4)
-                    for v_idx, v_item in enumerate(display_vids):
-                        with v_cols[v_idx % 4]:
-                            thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
-                            click_url = v_item['link'] if v_item['link'] and not pd.isna(v_item['link']) else "#"
-                            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>' if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])) else ''
-                            ch_name = v_item.get('channel', 'Official Channel')
-                            
-                            st.markdown(f"""
-                            <a href="{click_url}" target="_blank" class="yt-video-card-link">
-                                <div class="yt-video-card">
-                                    <div class="yt-thumbnail-container">
-                                        <img class="yt-thumbnail-img" src="{thumb}">
-                                    </div>
-                                    <div class="yt-video-details">
-                                        <div class="yt-video-title">{v_item["title"]}</div>
-                                        <div class="yt-video-channel">👤 {ch_name}</div>
-                                        <div class="yt-video-meta">📅 {v_item["date"]}</div>
-                                        {note_html}
-                                    </div>
-                                </div>
-                            </a>
-                            """, unsafe_allow_html=True)
-                            
-                    if len(shelf_records) > 4:
-                        v_btn_label = "🔼 ยุบแถว" if st.session_state[state_key] else f"🔽 ดูเพิ่มเติมในหมวดนี้ ({len(shelf_records)-4} คลิป)"
-                        if st.button(v_btn_label, key=f"btn_{state_key}"):
-                            st.session_state[state_key] = not st.session_state[state_key]
-                            st.rerun()
-
-    # ---- TAB 3 & 4 ----
-    with tab_gifts:
-        st.markdown(f'<div class="yt-shelf-title">{tab_labels.get("gifts", "🎨 Digital Goods")}</div>', unsafe_allow_html=True)
-        if not gifts_list: st.caption("ขณะนี้ยังไม่มีรูปภาพของแจกเปิดให้ดาวน์โหลด")
-        else:
-            g_cols = st.columns(4)
-            for g_idx, g_item in enumerate(gifts_list):
-                with g_cols[g_idx % 4]:
-                    img_src = g_item['img_url']
-                    if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
-                    pin_badge = '<span style="color:#f59e0b; font-weight:bold;">📌 [แนะนำ]</span> ' if g_item.get('pinned', False) else ''
-                    st.markdown(f"""
-                    <div class="gift-card">
-                        <div class="gift-img-container">
-                            <img class="gift-img" src="{img_src}">
-                        </div>
-                        <div class="video-title" style="text-align:center; font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{pin_badge}{g_item["title"]}</div>
-                        <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-    with tab_letters:
-        st.markdown(f"<h3 style='color: #ef4444; margin-top:10px;'>{tab_labels.get('letters', '💌 ส่งข้อความ')}</h3>", unsafe_allow_html=True)
-        with st.form(key="fan_message_form_v8", clear_on_submit=True):
-            fan_name = st.text_input("ชื่อเล่นของคุณ:")
-            fan_msg = st.text_area("ข้อความที่คุณอยากฝากถึงแอดมิน:")
-            submit_letter = st.form_submit_button("✉️ ส่งจดหมายลับ")
-        if submit_letter and fan_msg.strip():
-            save_message(fan_name.strip() if fan_name.strip() else "แฟนคลับผู้ไม่ประสงค์ออกนาม", fan_msg.strip())
-            st.success("💖 ส่งจดหมายสำเร็จแล้ว!")
+                elif t_type == "fan_letters":
+                    with st.form(key=f"fan_msg_form_{index}", clear_on_submit=True):
+                        fan_name = st.text_input("ชื่อเล่นของคุณ:")
+                        fan_msg = st.text_area("ข้อความที่คุณอยากฝากถึงแอดมิน:")
+                        submit_letter = st.form_submit_button("✉️ ส่งจดหมายลับ")
+                    if submit_letter and fan_msg.strip():
+                        save_message(fan_name.strip() if fan_name.strip() else "แฟนคลับผู้ไม่ประสงค์ออกนาม", fan_msg.strip())
+                        st.success("💖 ส่งจดหมายสำเร็จแล้ว!")
 
 # ==========================================
 # ⚙️ ระบบหลังบ้านจัดการข้อมูล
@@ -448,66 +425,114 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
         if "edit_index" not in st.session_state: st.session_state.edit_index = None
         if "edit_gift_index" not in st.session_state: st.session_state.edit_gift_index = None
 
-        # 🆕 เพิ่มฟังก์ชันแก้ไขหัวข้อเมนูแท็บด้านบน และเพิ่ม/ลดหมวดหมู่วิดีโอ
-        with st.expander("🛠️ [เมนูใหม่] จัดการหัวข้อเว็บและหมวดหมู่เนื้อหา (Dynamic Headers)"):
-            st.markdown("#### 1. แก้ไขชื่อแท็บเมนูด้านบน")
-            c_t1, c_t2 = st.columns(2)
-            with c_t1:
-                new_home_tab = st.text_input("แท็บที่ 1:", value=sys_config["tabs"].get("home", "หน้าแรก"))
-                new_gifts_tab = st.text_input("แท็บที่ 3:", value=sys_config["tabs"].get("gifts", "🎨 Digital Goods"))
-            with c_t2:
-                new_vids_tab = st.text_input("แท็บที่ 2:", value=sys_config["tabs"].get("videos", "วิดีโอทั้งหมด"))
-                new_letters_tab = st.text_input("แท็บที่ 4:", value=sys_config["tabs"].get("letters", "💌 ส่งข้อความ"))
+        # ⚙️ Expander เมนูบริหารหัวข้อเว็บบอร์ด แท็บเมนู และหมวดหมู่เนื้อหา แบบไม่จำกัดจำนวน
+        with st.expander("🛠️ [เมนูใหม่] จัดการโครงสร้างแท็บเมนูด้านบน และเพิ่ม/ลดแท็บอิสระ"):
+            st.markdown("### 📋 รายการแท็บปัจจุบันที่มีอยู่บนหน้าหลัก")
             
+            updated_tabs = []
+            for t_idx, t_item in enumerate(sys_config.get("tabs", [])):
+                col_t1, col_t2, col_t3, col_t4 = st.columns([1.5, 1.5, 1.5, 0.5])
+                
+                # ปรับแต่งชื่อแสดงผลของแต่ละแท็บ
+                t_title = col_t1.text_input(f"ชื่อป้ายแท็บที่ {t_idx+1}", value=t_item["title"], key=f"tab_title_in_{t_idx}")
+                
+                # แสดงประเภทและเป้าหมายข้อมูล (อ่านได้อย่างเดียวในส่วนนี้เพื่อป้องกันบั๊ก)
+                col_t2.caption(f"ประเภทเนื้อหา: `{t_item['type']}`")
+                if t_item['target']:
+                    col_t3.caption(f"เป้าหมายดึงข้อมูล: `{t_item['target']}`")
+                else:
+                    col_t3.caption("-")
+                
+                # ปุ่มลบแท็บทิ้ง
+                if col_t4.button("🗑️", key=f"del_tab_btn_{t_idx}"):
+                    # ป้องกันการกดลบจนหน้าจอว่างเปล่าไร้เมนู
+                    if len(sys_config["tabs"]) <= 1:
+                        st.error("ไม่สามารถลบแท็บทั้งหมดได้ ต้องเหลือไว้อย่างน้อย 1 แท็บครับ")
+                    else:
+                        sys_config["tabs"].pop(t_idx)
+                        save_system_config(sys_config)
+                        st.success("ลบแท็บเมนูเรียบร้อย!")
+                        st.rerun()
+                
+                updated_tabs.append({
+                    "id": t_item["id"],
+                    "title": t_title,
+                    "type": t_item["type"],
+                    "target": t_item["target"]
+                })
+            
+            # บันทึกการแก้ไขชื่อชื่อแท็บที่มีอยู่เดิม
+            if st.button("💾 บันทึกการแก้ไขชื่อแท็บ", key="save_existing_tabs_name"):
+                sys_config["tabs"] = updated_tabs
+                save_system_config(sys_config)
+                st.success("อัปเดตชื่อแท็บสำเร็จ!")
+                st.rerun()
+
             st.markdown("---")
-            st.markdown("#### 2. จัดการหมวดหมู่ประเภทวิดีโอ (Video Shelves)")
+            st.markdown("### ➕ เพิ่มแท็บเมนูใหม่เข้าสู่หน้าหลัก")
             
-            # ฟอร์มเพิ่มหมวดหมู่ใหม่
-            with st.form(key="add_shelf_form"):
-                st.markdown("**➕ เพิ่มหมวดหมู่ใหม่**")
-                new_type_id = st.text_input("รหัสประเภทหมวดหมู่ (ภาษาอังกฤษ เช่น On-stage / Dance):")
-                new_type_title = st.text_input("ชื่อแสดงผลหมวดหมู่ (พร้อม Emoji เช่น 🕺 เต้น / Coreography):")
-                add_shelf_submit = st.form_submit_button("➕ เพิ่มหมวดหมู่")
+            with st.form(key="create_new_tab_form"):
+                new_tab_title = st.text_input("ระบุชื่อแท็บใหม่ที่ต้องการให้แสดง (เช่น 💃 คลิปแดนซ์ / Dance Focus):")
+                new_tab_content_type = st.selectbox(
+                    "ระบุประเภทข้อมูลที่จะนำมาแสดงในแท็บนี้:",
+                    [
+                        ("home_dashboard", "แดชบอร์ดหน้าแรก (มีประกาศ เพลงโฟกัส และคลังแนะนำ)"),
+                        ("all_videos", "หน้าคลังรวมวิดีโอทุกหมวดหมู่แยกชั้น"),
+                        ("single_shelf_only", "ดึงเฉพาะวิดีโอหมวดหมู่ใดหมวดหมู่หนึ่งมาโชว์"),
+                        ("digital_goods", "คลังโหลดรูปภาพ Digital Goods"),
+                        ("fan_letters", "กล่องข้อความ / ส่งจดหมาย")
+                    ],
+                    format_func=lambda x: x[1]
+                )
+                
+                # ดึงลิสต์รายชื่อหมวดหมู่วิดีโอที่มีในระบบ เพื่อใช้ในกรณีเลือกประเภท single_shelf_only
+                shelf_options = [s["type"] for s in sys_config.get("video_shelves", [])]
+                chosen_shelf_target = st.selectbox("กรณีเลือก 'ดึงเฉพาะวิดีโอหมวดหมู่เดียว' ให้ระบุหมวดหมู่เป้าหมายตรงนี้:", shelf_options if shelf_options else ["-"])
+                
+                add_tab_submit = st.form_submit_button("🚀 ยืนยันเพิ่มแท็บเข้าสู่หน้าหลัก")
+                
+                if add_tab_submit and new_tab_title.strip():
+                    unique_id = f"tab_{int(time.time())}"
+                    target_val = chosen_shelf_target if new_tab_content_type[0] == "single_shelf_only" else ""
+                    
+                    sys_config["tabs"].append({
+                        "id": unique_id,
+                        "title": new_tab_title.strip(),
+                        "type": new_tab_content_type[0],
+                        "target": target_val
+                    })
+                    save_system_config(sys_config)
+                    st.success(f"เพิ่มแท็บ '{new_tab_title}' สำเร็จแล้ว!")
+                    st.rerun()
+
+            st.markdown("---")
+            st.markdown("### 📂 จัดการรายชื่อหมวดหมู่ประเภทวิดีโอ (Video Shelves)")
+            with st.form(key="add_shelf_form_new"):
+                st.markdown("**➕ สร้างหมวดหมู่วิดีโอใหม่**")
+                new_type_id = st.text_input("รหัสหมวดหมู่ (ภาษาอังกฤษ ห้ามซ้ำ เช่น Vlog / Concert):")
+                new_type_title = st.text_input("ชื่อป้ายหมวดหมู่แสดงผลบนเว็บ (ใส่ Emoji ได้ เช่น 📸 วล็อกไลฟ์สไตล์):")
+                add_shelf_submit = st.form_submit_button("➕ บันทึกหมวดหมู่")
                 if add_shelf_submit and new_type_id.strip() and new_type_title.strip():
-                    # ตรวจสอบตัวซ้ำ
-                    exists = any(s['type'] == new_type_id.strip() for s in sys_config["video_shelves"])
-                    if not exists:
+                    if not any(s['type'] == new_type_id.strip() for s in sys_config["video_shelves"]):
                         sys_config["video_shelves"].append({"type": new_type_id.strip(), "title": new_type_title.strip()})
-                        sys_config["tabs"] = {"home": new_home_tab, "videos": new_vids_tab, "gifts": new_gifts_tab, "letters": new_letters_tab}
                         save_system_config(sys_config)
                         st.success("เพิ่มหมวดหมู่เรียบร้อย!")
                         st.rerun()
                     else:
-                        st.error("มีรหัสหมวดหมู่นี้อยู่ในระบบแล้ว")
+                        st.error("รหัสหมวดหมู่นี้ซ้ำกับที่มีอยู่แล้ว")
 
-            # ตารางรายการหมวดหมู่ปัจจุบันที่มีสิทธิ์ให้ลบออกได้
-            st.markdown("**📋 รายการหมวดหมู่ในระบบปัจจุบัน (สามารถเรียงและลบได้)**")
-            temp_shelves = list(sys_config["video_shelves"])
-            for s_idx, s_item in enumerate(temp_shelves):
+            for s_idx, s_item in enumerate(list(sys_config["video_shelves"])):
                 col_s1, col_s2, col_s3 = st.columns([1.5, 2, 0.5])
                 col_s1.text(f"ID: {s_item['type']}")
-                # ให้แอดมินแก้ไขชื่อภาษาไทยหน้างานได้เลย
-                updated_title = col_s2.text_input(f"ชื่อแสดงผลสำหรับ {s_item['type']}", value=s_item['title'], key=f"shelf_title_{s_idx}")
+                updated_title = col_s2.text_input(f"ชื่อป้ายหมวดหมู่ของ {s_item['type']}", value=s_item['title'], key=f"shelf_title_edit_{s_idx}")
                 sys_config["video_shelves"][s_idx]["title"] = updated_title
-                
-                if col_s3.button("🗑️", key=f"del_shelf_{s_idx}"):
+                if col_s3.button("🗑️", key=f"del_shelf_btn_{s_idx}"):
                     sys_config["video_shelves"].pop(s_idx)
-                    sys_config["tabs"] = {"home": new_home_tab, "videos": new_vids_tab, "gifts": new_gifts_tab, "letters": new_letters_tab}
                     save_system_config(sys_config)
                     st.success("ลบหมวดหมู่สำเร็จ!")
                     st.rerun()
 
-            if st.button("💾 บันทึกการตั้งค่าหัวข้อทั้งหมด", key="save_all_headers_btn"):
-                sys_config["tabs"] = {
-                    "home": new_home_tab,
-                    "videos": new_vids_tab,
-                    "gifts": new_gifts_tab,
-                    "letters": new_letters_tab
-                }
-                save_system_config(sys_config)
-                st.success("บันทึกโครงสร้างระบบหัวข้อใหม่ทั้งหมดเรียบร้อยแล้ว!")
-                st.rerun()
-
+        # ส่วนอื่นคงที่ตามระบบเดิม
         with st.expander("🎯 1. ตั้งค่าเพลงโปรเจกต์โฟกัส"):
             curr_mv = load_mv_highlight()
             with st.form(key="mv_form_exp"):
@@ -561,7 +586,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if g_c3.button("📝", key=f"edit_g_{g_i}"): st.session_state.edit_gift_index = g_i; st.rerun()
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
-        # 🎬 4. จัดการคลังวิดีโอทั่วไป
         with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
             st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
             yt_fetch_link = st.text_input("วางลิงก์ YouTube ตรงนี้เพื่อดึงข้อมูลอัตโนมัติ:")
@@ -573,13 +597,10 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         st.session_state["temp_fetched_channel"] = fetched_channel
                         st.session_state["temp_fetched_date"] = fetched_date
                         st.session_state["temp_fetched_link"] = yt_fetch_link
-                        st.success("ดึงข้อมูลสำเร็จ! ระบบดึงวันที่และข้อมูลอื่นเตรียมลงฟอร์มเรียบร้อย")
-                else:
-                    st.warning("กรุณากรอกลิงก์ก่อนกดดึงข้อมูลครับ")
+                        st.success("ดึงข้อมูลสำเร็จ!")
+                else: st.warning("กรุณากรอกลิงก์ก่อนกดครับ")
 
             st.markdown("---")
-
-            # ดึงประเภทข้อมูลมาจากระบบ config เพื่อสร้างลิสต์ตัวเลือกแบบ Dynamic
             available_options = [s["type"] for s in sys_config.get("video_shelves", [])]
             if not available_options: available_options = ["Variety / TV"]
 
@@ -601,9 +622,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     d_channel = st.session_state.get("temp_fetched_channel", "")
                     d_date = st.session_state.get("temp_fetched_date", datetime.date.today())
                     d_link = st.session_state.get("temp_fetched_link", "")
-                    d_note = ""
-                    d_pinned = False
-                    d_type_idx = 0
+                    d_note, d_pinned, d_type_idx = "", False, 0
                     btn_txt = "🚀 อัปโหลดเข้าคลัง"
                 
                 with st.form(key='admin_vid_exp_v8'):
@@ -617,48 +636,24 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     vid_submit = st.form_submit_button(btn_txt)
                 
                 if vid_submit and title.strip():
-                    clean_title = clean_html_tags(title)
-                    clean_note = clean_html_tags(note)
-                    clean_channel = clean_html_tags(channel) if channel.strip() else "Official Channel"
-                    
-                    item_data = {
-                        "title": clean_title, 
-                        "channel": clean_channel,
-                        "date": str(date_val), 
-                        "type": w_type, 
-                        "link": link, 
-                        "note": clean_note, 
-                        "pinned": is_pinned
-                    }
+                    item_data = {"title": clean_html_tags(title), "channel": clean_html_tags(channel) if channel.strip() else "Official Channel", "date": str(date_val), "type": w_type, "link": link, "note": clean_html_tags(note), "pinned": is_pinned}
                     if st.session_state.edit_index is not None:
                         st.session_state.schedules[st.session_state.edit_index] = item_data
                         st.session_state.edit_index = None
-                    else: 
-                        st.session_state.schedules.append(item_data)
-                    
+                    else: st.session_state.schedules.append(item_data)
                     for k in ["temp_fetched_title", "temp_fetched_channel", "temp_fetched_date", "temp_fetched_link"]:
                         if k in st.session_state: del st.session_state[k]
-                        
-                    save_data(st.session_state.schedules)
-                    st.success("บันทึกข้อมูลและวันที่ออนแอร์สำเร็จ!")
-                    st.rerun()
-                    
-                if st.session_state.edit_index is not None:
-                    if st.button("❌ Cancel แก้ไขวิดีโอ"): st.session_state.edit_index = None; st.rerun()
-            
+                    save_data(st.session_state.schedules); st.success("บันทึกข้อมูลสำเร็จ!"); st.rerun()
+
             with col_v_manage:
                 st.markdown("**📋 รายการวิดีโอปัจจุบัน**")
                 for idx, item in enumerate(st.session_state.schedules):
                     v_c1, v_c2, v_c3, v_c4 = st.columns([2, 0.9, 0.6, 0.5])
                     v_c1.write(f"{idx+1}. {item['title']} \n<br><span style='color:#ef4444; font-size:11px;'>👤 ช่อง: {item.get('channel', 'Official Channel')} | 📂 หมวด: {item['type']}</span>", unsafe_allow_html=True)
-                    v_pin_val = item.get('pinned', False)
-                    v_pin_lbl = "📌 หมุดอยู่" if v_pin_val else "◽ ทั่วไป"
-                    if v_c2.button(v_pin_lbl, key=f"quick_pin_v_{idx}"): item['pinned'] = not v_pin_val; save_data(st.session_state.schedules); st.rerun()
+                    if v_c2.button("📌 หมุดอยู่" if item.get('pinned', False) else "◽ ทั่วไป", key=f"quick_pin_v_{idx}"): item['pinned'] = not item.get('pinned', False); save_data(st.session_state.schedules); st.rerun()
                     if v_c3.button("📝", key=f"edit_v_{idx}"): st.session_state.edit_index = idx; st.rerun()
-                    if v_c4.button("🗑️", key=f"del_v_{idx}"): 
-                        st.session_state.schedules.pop(idx); save_data(st.session_state.schedules); st.rerun()
+                    if v_c4.button("🗑️", key=f"del_v_{idx}"): st.session_state.schedules.pop(idx); save_data(st.session_state.schedules); st.rerun()
 
-        # กล่องจดหมาย
         with st.expander("📬 5. เปิดกล่องอ่านจดหมายลับจากแฟนคลับ (Fan Letters)"):
             messages_list = load_messages()
             if not messages_list: st.info("กล่องจดหมายว่างอยู่")
