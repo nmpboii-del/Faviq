@@ -6,7 +6,7 @@ import requests
 import time
 import datetime
 import base64
-import json  # ใช้สำหรับเก็บค่าคอนฟิกหัวข้อและแท็บแบบ Dynamic
+import json
 
 # ตั้งค่าหน้า Streamlit
 try:
@@ -28,7 +28,7 @@ MV_FILE = "mv_highlight.csv"
 GIFTS_FILE = "fan_gifts.csv"      
 MESSAGES_FILE = "fan_messages.csv" 
 CONFIG_FILE = "system_config.json"  
-EVENT_SCHEDULE_FILE = "artist_event_schedule.csv"  # ไฟล์เก็บตารางงานศิลปินเพิ่มใหม่
+EVENT_SCHEDULE_FILE = "artist_event_schedule.csv"  
 
 ADMIN_PASSWORD = "Nittaya_195"
 
@@ -367,14 +367,17 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                             st.info("ยังไม่มีคลิปปักหมุดในขณะนี้")
                             
                     with col_dashboard_right:
-                        st.markdown('<div class="yt-shelf-title">📅 ตารางงานศิลปิน</div>', unsafe_allow_html=True)
+                        # 💡 ปรับปรุงส่วนหน้าหลักให้แสดงตารางงานแค่ 3 วันที่ใกล้ที่สุดเท่านั้นตามที่ขอมา
+                        st.markdown('<div class="yt-shelf-title">📅 ตารางงานศิลปิน (3 วันล่าสุด)</div>', unsafe_allow_html=True)
                         event_list = load_event_schedules()
                         if event_list:
-                            for ev in event_list:
+                            upcoming_events = event_list[:3]
+                            for ev in upcoming_events:
+                                event_date_str = str(ev.get('วันที่', '-')).replace('.0', '')
                                 note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
                                 st.markdown(f"""
                                 <div class="schedule-item-box">
-                                    <div class="schedule-date-badge">{ev.get('วันที่', '-')}</div>
+                                    <div class="schedule-date-badge">{event_date_str}</div>
                                     <div class="schedule-content-info">
                                         <div class="schedule-title-text">{ev.get('รายการ', '-')}</div>
                                         <div class="schedule-meta-row">⏰ <b>Time:</b> {ev.get('เวลา', '-')}</div>
@@ -502,6 +505,31 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </a>
                                 """, unsafe_allow_html=True)
 
+                # 💡 เพิ่ม Logic การทำงานของแท็บตารางงานเดี่ยวเต็มรูปแบบ (เมื่อผู้ใช้กดสร้างแท็บข้อมูลนี้)
+                elif t_type == "artist_events_all":
+                    st.markdown('<div class="yt-shelf-title">🗓️ คลังข้อมูลตารางงานศิลปินทั้งหมด</div>', unsafe_allow_html=True)
+                    event_list = load_event_schedules()
+                    if not event_list:
+                        st.info("ขณะนี้ไม่มีข้อมูลตารางงานในระบบ")
+                    else:
+                        # แบ่งการแสดงผลเป็นแบบแถวยาวเต็มหน้ากระดาษอ่านง่าย
+                        for ev in event_list:
+                            event_date_str = str(ev.get('วันที่', '-')).replace('.0', '')
+                            note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
+                            st.markdown(f"""
+                            <div class="schedule-item-box" style="margin-bottom: 20px;">
+                                <div class="schedule-date-badge" style="background-color: #3b82f6; color:#fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);">{event_date_str}</div>
+                                <div class="schedule-content-info">
+                                    <div class="schedule-title-text" style="color: #60a5fa; font-size: 19px;">{ev.get('รายการ', '-')}</div>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-top: 8px;">
+                                        <div class="schedule-meta-row" style="font-size: 15px;">⏰ <b>เวลา:</b> {ev.get('เวลา', '-')}</div>
+                                        <div class="schedule-meta-row-two-lines" style="font-size: 15px;">📍 <b>สถานที่ / ช่องรับชม:</b> {ev.get('สถานที่/ช่อง', '-')}</div>
+                                    </div>
+                                    {note_snippet}
+                                </div>
+                             </div>
+                            """, unsafe_allow_html=True)
+
                 elif t_type == "fan_letters":
                     with st.form(key=f"fan_msg_form_{index}", clear_on_submit=True):
                         fan_name = st.text_input("ชื่อเล่นของคุณ:")
@@ -564,10 +592,12 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
             st.markdown("### ➕ เพิ่มแท็บเมนูใหม่เข้าสู่หน้าหลัก")
             with st.form(key="create_new_tab_form"):
                 new_tab_title = st.text_input("ระบุชื่อแท็บใหม่ที่ต้องการให้แสดง:")
+                # 💡 จุดนี้คือจุดเพิ่มตัวเลือกประเภทข้อมูลใหม่ "คลังตารางงานศิลปินทั้งหมด" ลงใน Dropdown ของผู้ใช้งานตามรูปภาพ image_365789.png ครับ
                 new_tab_content_type = st.selectbox(
                     "ระบุประเภทข้อมูลที่จะนำมาแสดงในแท็บนี้:",
                     [
                         ("home_dashboard", "แดชบอร์ดหน้าแรก (มีประกาศ เพลงโฟกัส คลังภาพแนะนำ และวิดีโอแนะนำ)"),
+                        ("artist_events_all", "🗓️ คลังตารางงานศิลปินทั้งหมด (แยกออกมาเฉพาะเจาะจง)"),
                         ("all_videos", "หน้าคลังรวมวิดีโอทุกหมวดหมู่แยกชั้น"),
                         ("single_shelf_only", "ดึงเฉพาะวิดีโอหมวดหมู่ใดหมวดหมู่หนึ่งมาโชว์"),
                         ("digital_goods", "คลังโหลดรูปภาพ Digital Goods"),
@@ -667,12 +697,11 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
         # =========================================================================
-        # 🗓️ ส่วนสำหรับจัดการข้อมูลตารางงานศิลปิน (เพิ่มระบบแก้ไขข้อมูลแล้ว)
+        # 🗓️ ส่วนสำหรับจัดการข้อมูลตารางงานศิลปิน
         # =========================================================================
         with st.expander("🗓️ จัดการตารางงานศิลปิน (เพิ่ม/แก้ไข/ลบตารางงานปัจจุบัน)"):
             current_events_list = load_event_schedules()
             
-            # ตรวจสอบค่าเริ่มต้นฟอร์มกรณีมีการกดแก้ไข (Edit State)
             if st.session_state.edit_event_index is not None:
                 st.markdown("### 📝 แก้ไขรายการตารางงาน")
                 ev_curr = current_events_list[st.session_state.edit_event_index]
@@ -727,10 +756,8 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 for ev_idx, ev_item in enumerate(current_events_list):
                     col_ev_info, col_ev_actions = st.columns([3.5, 1.5])
                     with col_ev_info:
-                        #  โค้ดที่แก้ไขแล้ว (แปลงเป็น str ก่อนสั่ง replace)
                         event_date_str = str(ev_item.get('วันที่', '-')).replace('.0', '')
                         st.write(f"**[{event_date_str}] {ev_item.get('รายการ', '-')}** \n<br><span style='color:#facc15; font-size:12px;'>⏰ เวลา: {ev_item.get('เวลา', '-')} | 📍 สถานที่/ช่อง: {ev_item.get('สถานที่/ช่อง', '-')} | 💬 หมายเหตุ: {ev_item.get('หมายเหตุ', '-')}</span>", unsafe_allow_html=True)
-                    
                     with col_ev_actions:
                         act_c1, act_c2 = st.columns(2)
                         if act_c1.button("📝 แก้ไข", key=f"edit_ev_btn_{ev_idx}"):
