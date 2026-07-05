@@ -75,7 +75,9 @@ def get_youtube_thumbnail(url):
 def fetch_youtube_details(url):
     video_id = extract_youtube_id(url)
     default_date = datetime.date.today()
-    if not video_id: return "วิดีโอไม่ระบุชื่อ", "Unknown Channel", default_date
+    title = "วิดีโอ YouTube"
+    channel = "Official Channel"
+    if not video_id: return title, channel, default_date
     try:
         embed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
         res = requests.get(embed_url, timeout=5)
@@ -99,8 +101,7 @@ def fetch_youtube_details(url):
                 default_date = datetime.datetime.strptime(parsed_date, "%Y-%m-%d").date()
             return title, channel, default_date
     except: pass
-    try: return title, channel, default_date
-    except: return "วิดีโอ YouTube", "Official Channel", default_date
+    return title, channel, default_date
 
 def fetch_live_youtube_views(video_id):
     if not video_id: return None
@@ -227,7 +228,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ↩️ ย้ายเมนูเลือกโหมดกลับมาที่ Sidebar ตามคำขอเรียบร้อยครับ
 view_mode = st.sidebar.radio("MENU", ["🏠 หน้าแรกแกลเลอรี", "⚙️ ระบบหลังบ้าน"])
 
 # ==========================================
@@ -268,7 +268,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
             st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 เวลาที่อัปเดตล่าสุด(อัปเดตทุก 10 นาที): {update_str} น.</span>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # ดึงรายชื่อแท็บแบบ Dynamic
     defined_tabs = sys_config.get("tabs", [])
     valid_tabs = []
     if isinstance(defined_tabs, list):
@@ -287,7 +286,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                 t_type = str(tab_info.get("type", "")).strip()
                 t_target = tab_info.get("target", "")
                 
-                # ตรวจจับแบบครอบคลุม: ถ้าประเภทระบุชัด หรือชื่อแท็บเขียนว่า Digital Goods ให้วิ่งเข้าแกลเลอรีทันที ป้องกันปัญหารูปพัง
                 if t_type == "digital_goods" or "digital" in t_title_text or "good" in t_title_text or "gift" in t_title_text:
                     st.markdown('<div class="yt-shelf-title">🎨 คลังดาวน์โหลดรูปภาพ Digital Goods ทั้งหมด</div>', unsafe_allow_html=True)
                     if not gifts_list: 
@@ -307,7 +305,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 """, unsafe_allow_html=True)
 
                 elif t_type == "home_dashboard":
-                    # ✨ โชว์ Digital Goods ล่าสุด 4 อัน บนหน้าแรกสุด
                     if gifts_list:
                         st.markdown('<div class="yt-shelf-title">🎨 ล่าสุดจาก Digital Goods โหลดฟรี!</div>', unsafe_allow_html=True)
                         g_home_cols = st.columns(4)
@@ -323,7 +320,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </div>
                                 """, unsafe_allow_html=True)
                                 
-                    # โซนวิดีโอแนะนำปักหมุด
                     pinned_vids = [v for v in all_vids if v.get('pinned', False)]
                     if pinned_vids:
                         st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม</div>', unsafe_allow_html=True)
@@ -347,7 +343,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </a>
                                 """, unsafe_allow_html=True)
                     
-                    # โชว์วิดีโอทั่วไปรายหมวดหมู่
                     homepage_shelves = sys_config.get("video_shelves", [])[:2]
                     for shelf in homepage_shelves:
                         df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
@@ -586,25 +581,22 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if g_c3.button("📝", key=f"edit_g_{g_i}"): st.session_state.edit_gift_index = g_i; st.rerun()
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
+        # =========================================================================
+        # 🎬 4. ส่วนจัดระเบียบวิดีโอใหม่ (แก้ไขระเบียบตัวแปรและ Widget Key ทั้งหมด)
+        # =========================================================================
         with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
             st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
             
-            # 🛠️ แยกช่องกรอกลิงก์กับปุ่มออกมานอก Form เพื่อไม่ให้โดน Streamlit รีเซ็ตค่ากลางทาง
-        with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
-            st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
-            
-            # ช่องกรอกลิงก์ด่วนนอก Form
-            yt_fetch_link = st.text_input("วางลิงก์ YouTube ตรงนี้เพื่อดึงข้อมูลอัตโนมัติ:")
-            if st.button("🔍 ดึงชื่อคลิป ชื่อช่อง และวันที่ออนแอร์"):
+            yt_fetch_link = st.text_input("วางลิงก์ YouTube ตรงนี้เพื่อดึงข้อมูลอัตโนมัติ:", key="yt_fetch_link_input_v2")
+            if st.button("🔍 ดึงชื่อคลิป ชื่อช่อง และวันที่ออนแอร์", key="btn_fetch_yt_v2"):
                 if yt_fetch_link.strip():
                     with st.spinner("กำลังแกะข้อมูลจากหลังบ้าน YouTube..."):
                         fetched_title, fetched_channel, fetched_date = fetch_youtube_details(yt_fetch_link)
                         
-                        # เก็บลงตัวแปรชั่วคราวที่ไม่ไปชนกับระบบ widget key
-                        st.session_state["fetched_title_val"] = fetched_title
-                        st.session_state["fetched_channel_val"] = fetched_channel
-                        st.session_state["fetched_date_val"] = fetched_date
-                        st.session_state["fetched_link_val"] = yt_fetch_link
+                        st.session_state["fetched_title_val_v2"] = fetched_title
+                        st.session_state["fetched_channel_val_v2"] = fetched_channel
+                        st.session_state["fetched_date_val_v2"] = fetched_date
+                        st.session_state["fetched_link_val_v2"] = yt_fetch_link
                         
                         st.success("ดึงข้อมูลสำเร็จ! ข้อมูลถูกนำไปหยอดในช่องกรอกด้านล่างแล้ว")
                         st.rerun()
@@ -615,7 +607,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
 
             col_v_form, col_v_manage = st.columns([1, 1.2])
             with col_v_form:
-                # 1. เช็คว่าอยู่ในโหมดแก้ไขข้อมูลเก่าหรือไม่
                 if st.session_state.edit_index is not None:
                     curr = st.session_state.schedules[st.session_state.edit_index]
                     d_title = curr["title"]
@@ -628,23 +619,21 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     d_type_idx = available_options.index(curr["type"]) if curr["type"] in available_options else 0
                     btn_txt = "🔄 อัปเดตวิดีโอ"
                 else:
-                    # 2. โหมดเพิ่มใหม่: เช็คว่ามีข้อมูลที่กดดึงมาจากลิงก์ YouTube ไหม ถ้าไม่มีให้ตั้งเป็นค่าว่าง
-                    d_title = st.session_state.get("fetched_title_val", "")
-                    d_channel = st.session_state.get("fetched_channel_val", "")
-                    d_date = st.session_state.get("fetched_date_val", datetime.date.today())
-                    d_link = st.session_state.get("fetched_link_val", "")
+                    d_title = st.session_state.get("fetched_title_val_v2", "")
+                    d_channel = st.session_state.get("fetched_channel_val_v2", "")
+                    d_date = st.session_state.get("fetched_date_val_v2", datetime.date.today())
+                    d_link = st.session_state.get("fetched_link_val_v2", "")
                     d_note, d_pinned, d_type_idx = "", False, 0
                     btn_txt = "🚀 อัปโหลดเข้าคลัง"
                 
-                # ฟอร์มหลัก (ลบตัวอักษร key="..." ออกจาก text_input ทั้งหมดเพื่อป้องกัน Error)
-                with st.form(key='admin_vid_form_v11'):
-                    title = st.text_input("ชื่อคลิป:", value=d_title)
-                    channel = st.text_input("ชื่อช่องต้นทาง:", value=d_channel)
-                    date_val = st.date_input("วันที่ออนแอร์:", value=d_date)
-                    w_type = st.selectbox("ประเภท:", available_options, index=d_type_idx)
-                    link = st.text_input("ลิงก์คลิป:", value=d_link)
-                    note = st.text_area("โน้ตย่อ:", value=d_note)
-                    is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=d_pinned)
+                with st.form(key='admin_vid_form_v12'):
+                    title = st.text_input("ชื่อคลิป:", value=d_title, key="form_vid_title_v2")
+                    channel = st.text_input("ชื่อช่องต้นทาง:", value=d_channel, key="form_vid_channel_v2")
+                    date_val = st.date_input("วันที่ออนแอร์:", value=d_date, key="form_vid_date_v2")
+                    w_type = st.selectbox("ประเภท:", available_options, index=d_type_idx, key="form_vid_type_v2")
+                    link = st.text_input("ลิงก์คลิป:", value=d_link, key="form_vid_link_v2")
+                    note = st.text_area("โน้ตย่อ:", value=d_note, key="form_vid_note_v2")
+                    is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=d_pinned, key="form_vid_pinned_v2")
                     vid_submit = st.form_submit_button(btn_txt)
                 
                 if vid_submit and title.strip():
@@ -663,8 +652,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     else: 
                         st.session_state.schedules.append(item_data)
                     
-                    # ล้างข้อมูลสเตตัสหลังบันทึกสำเร็จ เพื่อให้กล่องกลับมาว่างพร้อมรับลิงก์ใหม่
-                    for k in ["fetched_title_val", "fetched_channel_val", "fetched_date_val", "fetched_link_val"]:
+                    for k in ["fetched_title_val_v2", "fetched_channel_val_v2", "fetched_date_val_v2", "fetched_link_val_v2", "form_vid_title_v2", "form_vid_channel_v2", "form_vid_link_v2", "form_vid_note_v2"]:
                         if k in st.session_state: del st.session_state[k]
                         
                     save_data(st.session_state.schedules)
@@ -682,132 +670,13 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         st.rerun()
                     if v_c3.button("📝", key=f"edit_v_{idx}"): 
                         st.session_state.edit_index = idx
-                        # เคลียร์ค่าลิงก์ด่วนเก่าออกไปก่อน เผื่อเปิดโหมดแก้ไข
-                        for k in ["fetched_title_val", "fetched_channel_val", "fetched_date_val", "fetched_link_val"]:
+                        for k in ["fetched_title_val_v2", "fetched_channel_val_v2", "fetched_date_val_v2", "fetched_link_val_v2"]:
                             if k in st.session_state: del st.session_state[k]
                         st.rerun()
                     if v_c4.button("🗑️", key=f"del_v_{idx}"): 
                         st.session_state.schedules.pop(idx)
                         save_data(st.session_state.schedules)
                         st.rerun()
-
-            st.markdown("---")
-            available_options = [s["type"] for s in sys_config.get("video_shelves", [])]
-            if not available_options: available_options = ["Variety / TV"]
-
-            col_v_form, col_v_manage = st.columns([1, 1.2])
-            with col_v_form:
-                # ตรวจสอบว่าอยู่ในโหมดแก้ไขหรือไม่
-                if st.session_state.edit_index is not None:
-                    curr = st.session_state.schedules[st.session_state.edit_index]
-                    # โหมดแก้ไข: โหลดค่าเก่ามาใส่ state
-                    st.session_state["vid_title_key"] = curr["title"]
-                    st.session_state["vid_channel_key"] = curr.get("channel", "Official Channel")
-                    st.session_state["vid_date_key"] = datetime.datetime.strptime(curr["date"], "%Y-%m-%d").date()
-                    st.session_state["vid_link_key"] = curr["link"]
-                    d_note = curr["note"]
-                    d_pinned = bool(curr.get('pinned', False))
-                    d_type_idx = available_options.index(curr["type"]) if curr["type"] in available_options else 0
-                    btn_txt = "🔄 อัปเดตวิดีโอ"
-                else:
-                    # โหมดเพิ่มใหม่: ถ้าไม่มีค่าใน state ให้ตั้งค่าเริ่มต้น
-                    if "vid_title_key" not in st.session_state: st.session_state["vid_title_key"] = ""
-                    if "vid_channel_key" not in st.session_state: st.session_state["vid_channel_key"] = ""
-                    if "vid_date_key" not in st.session_state: st.session_state["vid_date_key"] = datetime.date.today()
-                    if "vid_link_key" not in st.session_state: st.session_state["vid_link_key"] = ""
-                    d_note, d_pinned, d_type_idx = "", False, 0
-                    btn_txt = "🚀 อัปโหลดเข้าคลัง"
-                
-                # 🛠️ ใช้ `key=` เพื่อให้ผูกกับค่าที่ดึงมาจาก YouTube อัตโนมัติ
-                with st.form(key='admin_vid_form_v9'):
-                    title = st.text_input("ชื่อคลิป:", key="vid_title_key")
-                    channel = st.text_input("ชื่อช่องต้นทาง:", key="vid_channel_key")
-                    date_val = st.date_input("วันที่ออนแอร์:", key="vid_date_key")
-                    w_type = st.selectbox("ประเภท:", available_options, index=d_type_idx)
-                    link = st.text_input("ลิงก์คลิป:", key="vid_link_key")
-                    note = st.text_area("โน้ตย่อ:", value=d_note)
-                    is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=d_pinned)
-                    vid_submit = st.form_submit_button(btn_txt)
-                
-                if vid_submit and title.strip():
-                    item_data = {
-                        "title": clean_html_tags(title), 
-                        "channel": clean_html_tags(channel) if channel.strip() else "Official Channel", 
-                        "date": str(date_val), 
-                        "type": w_type, 
-                        "link": link, 
-                        "note": clean_html_tags(note), 
-                        "pinned": is_pinned
-                    }
-                    if st.session_state.edit_index is not None:
-                        st.session_state.schedules[st.session_state.edit_index] = item_data
-                        st.session_state.edit_index = None
-                    else: 
-                        st.session_state.schedules.append(item_data)
-                    
-                    # ล้างข้อมูลในกล่องข้อความหลังจากกดบันทึกเสร็จสิ้นเพื่อเตรียมรับคลิปต่อไป
-                    for k in ["vid_title_key", "vid_channel_key", "vid_date_key", "vid_link_key"]:
-                        if k in st.session_state: del st.session_state[k]
-                        
-                    save_data(st.session_state.schedules)
-                    st.success("บันทึกข้อมูลสำเร็จ!")
-                    st.rerun()
-
-            st.markdown("---")
-            available_options = [s["type"] for s in sys_config.get("video_shelves", [])]
-            if not available_options: available_options = ["Variety / TV"]
-
-            col_v_form, col_v_manage = st.columns([1, 1.2])
-            with col_v_form:
-                if st.session_state.edit_index is not None:
-                    curr = st.session_state.schedules[st.session_state.edit_index]
-                    d_title, d_link, d_note = curr["title"], curr["link"], curr["note"]
-                    d_channel = curr.get("channel", "Official Channel")
-                    d_pinned = bool(curr.get('pinned', False))
-                    try: d_date = datetime.datetime.strptime(curr["date"], "%Y-%m-%d").date()
-                    except: d_date = datetime.date.today()
-                    d_type_idx = available_options.index(curr["type"]) if curr["type"] in available_options else 0
-                    btn_txt = "🔄 อัปเดตวิดีโอ"
-                else:
-                    # 🛠️ นำข้อมูลที่แกะได้จากระบบด่วนมาหยอดใส่ตรงนี้
-                    d_title = st.session_state.get("active_fetched_title", "")
-                    d_channel = st.session_state.get("active_fetched_channel", "")
-                    d_date = st.session_state.get("active_fetched_date", datetime.date.today())
-                    d_link = st.session_state.get("active_fetched_link", "")
-                    d_note, d_pinned, d_type_idx = "", False, 0
-                    btn_txt = "🚀 อัปโหลดเข้าคลัง"
-                
-                # 🛠️ เปลี่ยนคีย์ของฟอร์มเป็น v10 เพื่อไม่ให้ซ้ำกับของเดิมระบบ
-                with st.form(key='admin_vid_form_v10'):
-                    title = st.text_input("ชื่อคลิป:", key="vid_title_key")
-                    channel = st.text_input("ชื่อช่องต้นทาง:", key="vid_channel_key")
-                    date_val = st.date_input("วันที่ออนแอร์:", key="vid_date_key")
-                    w_type = st.selectbox("ประเภท:", available_options, index=d_type_idx)
-                    link = st.text_input("ลิงก์คลิป:", key="vid_link_key")
-                    note = st.text_area("โน้ตย่อ:", value=d_note)
-                    is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=d_pinned)
-                    vid_submit = st.form_submit_button(btn_txt)
-                
-                if vid_submit and title.strip():
-                    item_data = {"title": clean_html_tags(title), "channel": clean_html_tags(channel) if channel.strip() else "Official Channel", "date": str(date_val), "type": w_type, "link": link, "note": clean_html_tags(note), "pinned": is_pinned}
-                    if st.session_state.edit_index is not None:
-                        st.session_state.schedules[st.session_state.edit_index] = item_data
-                        st.session_state.edit_index = None
-                    else: st.session_state.schedules.append(item_data)
-                    
-                    # ล้างข้อมูลสเตตัสหลังบันทึกสำเร็จ
-                    for k in ["active_fetched_title", "active_fetched_channel", "active_fetched_date", "active_fetched_link"]:
-                        if k in st.session_state: del st.session_state[k]
-                    save_data(st.session_state.schedules); st.success("บันทึกข้อมูลสำเร็จ!"); st.rerun()
-
-            with col_v_manage:
-                st.markdown("**📋 รายการวิดีโอปัจจุบัน**")
-                for idx, item in enumerate(st.session_state.schedules):
-                    v_c1, v_c2, v_c3, v_c4 = st.columns([2, 0.9, 0.6, 0.5])
-                    v_c1.write(f"{idx+1}. {item['title']} \n<br><span style='color:#ef4444; font-size:11px;'>👤 ช่อง: {item.get('channel', 'Official Channel')} | 📂 หมวด: {item['type']}</span>", unsafe_allow_html=True)
-                    if v_c2.button("📌 หมุดอยู่" if item.get('pinned', False) else "◽ ทั่วไป", key=f"quick_pin_v_{idx}"): item['pinned'] = not item.get('pinned', False); save_data(st.session_state.schedules); st.rerun()
-                    if v_c3.button("📝", key=f"edit_v_{idx}"): st.session_state.edit_index = idx; st.rerun()
-                    if v_c4.button("🗑️", key=f"del_v_{idx}"): st.session_state.schedules.pop(idx); save_data(st.session_state.schedules); st.rerun()
 
         with st.expander("📬 5. เปิดกล่องอ่านจดหมายลับจากแฟนคลับ (Fan Letters)"):
             messages_list = load_messages()
