@@ -214,7 +214,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
     # ดึงข้อมูลมาเตรียมไว้
     gifts_list = load_gifts()
     all_vids = load_data()
-    df_vids = pd.DataFrame(all_vids).sort_values(by='date', ascending=False) if all_vids else pd.DataFrame()
+    df_vids = pd.DataFrame(all_vids) if all_vids else pd.DataFrame()
     
     # 1. บอร์ดประกาศสำคัญ
     important_text = load_important_info()
@@ -233,8 +233,12 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
         st.markdown("<h4 style='color: #38bdf8; margin-top:0;'>📊 สถิติเป้าหมายอัตโนมัติ (อัปเดตทุก 1 ชม.)</h4>", unsafe_allow_html=True)
         c_views, t_views = int(mv_data['current_views']), int(mv_data['target_views'])
         progress_ratio = min(float(c_views / t_views), 1.0) if t_views > 0 else 0.0
-        st.columns(2)[0].metric(label="📈 ยอดวิวบน YouTube", value=f"{c_views:,} วิว")
-        st.columns(2)[1].metric(label="🎯 เป้าหมาย", value=f"{t_views:,} วิว")
+        
+        # FIX: แก้ไขเพื่อให้ตัวหนังสือยอดวิวและเป้าหมายอยู่ข้างกันอย่างถูกต้องในระนาบเดียวกัน
+        col_c, col_t = st.columns(2)
+        col_c.metric(label="📈 ยอดวิวบน YouTube", value=f"{c_views:,} วิว")
+        col_t.metric(label="🎯 เป้าหมาย", value=f"{t_views:,} วิว")
+        
         st.markdown(f"**🔥 ความสำเร็จของโปรเจกต์: {progress_ratio*100:.2f}%**")
         st.progress(progress_ratio)
         if mv_data.get('last_updated', 0) > 0:
@@ -244,7 +248,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
     st.markdown('</div>', unsafe_allow_html=True)
     
     # --------------------------------------------------
-    # แท็บนำทางถูกย้ายมาอยู่ตรงนี้ (ใต้ Project Focus ตามสั่ง)
+    # แท็บนำทาง
     # --------------------------------------------------
     tab_home, tab_videos, tab_gifts, tab_letters = st.tabs(["หน้าแรก", "วิดีโอทั้งหมด", "🎨 ของแจกสำหรับแฟนๆ", "💌 ส่งจดหมาย"])
     
@@ -262,7 +266,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                     thumb = get_youtube_thumbnail(pv_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
                     click_url = pv_item['link'] if pv_item['link'] and not pd.isna(pv_item['link']) else "#"
                     
-                    # แก้ไขจุดที่ทำให้ HTML เออเร่อหลุดออกไปนอกการ์ด
                     note_html = f'<div style="font-size:12px; color:#f59e0b; font-style:italic; margin-top:2px;">💬 {pv_item["note"]}</div>' if ('note' in pv_item and pv_item['note'] and not pd.isna(pv_item['note'])) else ''
                     
                     st.markdown(f"""
@@ -281,11 +284,10 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                     </a>
                     """, unsafe_allow_html=True)
                     
-        # ** เพิ่มหัวข้อของแจกแบบแนวนอน ต่อจากโซนแนะนำทันที **
         if gifts_list:
             st.markdown('<div class="yt-shelf-title">🎨 ของแจกสำหรับแฟนๆ / Fan Gifts</div>', unsafe_allow_html=True)
             g_home_cols = st.columns(4)
-            for g_idx, g_item in enumerate(gifts_list[:4]): # แสดงผลตัวอย่างสูงสุด 4 ชิ้นแรกในหน้าแรก
+            for g_idx, g_item in enumerate(gifts_list[:4]):
                 with g_home_cols[g_idx % 4]:
                     img_src = g_item['img_url']
                     if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
@@ -300,14 +302,15 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                     </div>
                     """, unsafe_allow_html=True)
 
-        # แสดงผลชั้นวางปกติ 2 หมวดหมู่ตัวอย่างในหน้าแรก
         if not df_vids.empty:
+            # หน้าแรก default เรียงจากใหม่ไปเก่า
+            df_vids_home = df_vids.sort_values(by='date', ascending=False)
             homepage_shelves = [
                 {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
                 {"type": "Online Video / YouTube", "title": "🔴 คลิปออนไลน์ / YouTube & Social Media Content"}
             ]
             for shelf in homepage_shelves:
-                df_shelf = df_vids[df_vids['type'] == shelf['type']]
+                df_shelf = df_vids_home[df_vids_home['type'] == shelf['type']]
                 if not df_shelf.empty:
                     st.markdown(f'<div class="yt-shelf-title">{shelf["title"]} <span class="yt-play-all">▶ เล่นทั้งหมด</span></div>', unsafe_allow_html=True)
                     v_cols = st.columns(4)
@@ -333,7 +336,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                             </a>
                             """, unsafe_allow_html=True)
 
-    # ---- TAB 2: วิดีโอทั้งหมด (แยกหมวดหมู่จัดเต็ม) ----
+    # ---- TAB 2: วิดีโอทั้งหมด (แยกหมวดหมู่จัดเต็ม + ระบบเรียงลำดับตามใจชอบ) ----
     with tab_videos:
         video_shelves = [
             {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
@@ -343,7 +346,17 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
         ]
         
         for shelf in video_shelves:
-            st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
+            col_title, col_sort = st.columns([3, 1])
+            with col_title:
+                st.markdown(f'<div class="yt-shelf-title" style="margin-bottom:0px;">{shelf["title"]}</div>', unsafe_allow_html=True)
+            with col_sort:
+                # NEW: เพิ่มตัวเลือกการจัดเรียงแยกตามแต่ละหมวดหมู่
+                sort_order = st.selectbox(
+                    "เรียงลำดับ:", 
+                    ["ใหม่ล่าสุด", "เก่าที่สุด"], 
+                    key=f"sort_{shelf['type'].replace(' ', '_')}"
+                )
+            
             if df_vids.empty: 
                 st.caption("ยังไม่มีข้อมูลวิดีโอในคลัง")
             else:
@@ -351,6 +364,10 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                 if df_shelf.empty: 
                     st.caption("ยังไม่มีวิดีโอในหมวดหมู่นี้")
                 else:
+                    # จัดเรียงตามเงื่อนไขที่คนดูเลือก
+                    is_ascending = True if sort_order == "เก่าที่สุด" else False
+                    df_shelf = df_shelf.sort_values(by='date', ascending=is_ascending)
+                    
                     shelf_records = df_shelf.to_dict('records')
                     state_key = f"show_all_{shelf['type'].replace(' ', '_')}"
                     if state_key not in st.session_state: st.session_state[state_key] = False
@@ -384,6 +401,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         if st.button(v_btn_label, key=f"btn_{state_key}"):
                             st.session_state[state_key] = not st.session_state[state_key]
                             st.rerun()
+            st.markdown("<hr style='margin:10px 0; border-color:#2d3748;'/>", unsafe_allow_html=True)
 
     # ---- TAB 3: ของแจกสำหรับแฟนๆ ----
     with tab_gifts:
