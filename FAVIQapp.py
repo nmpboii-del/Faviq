@@ -249,7 +249,7 @@ def save_important_info(text):
 
 if "schedules" not in st.session_state: st.session_state.schedules = load_data()
 
-# --- ตกแต่ง CSS หน้าเว็บสไตล์ YouTube (เพิ่มคลาสสำหรับงานสีเทาหม่น Past Event) ---
+# --- ตกแต่ง CSS หน้าเว็บสไตล์ YouTube (ปรับพฤติกรรม Past Event ให้ไม่มีเส้นขีดฆ่า) ---
 st.markdown(
     """
     <style>
@@ -278,10 +278,10 @@ st.markdown(
     .schedule-indent-text { padding-left: 20px; color: #f1f5f9; font-weight: 500; word-break: break-all; }
     .schedule-note-text { font-size: 12px; color: #94a3b8; font-style: italic; margin-top: 6px; }
 
-    /* สไตล์การ์ดตารางงานที่ผ่านมาแล้ว (สีเทาหม่น) */
+    /* สไตล์การ์ดตารางงานที่ผ่านมาแล้ว (ทำแค่สีเทาหม่น ไม่ขีดฆ่า) */
     .schedule-item-box.past-event { background-color: #1a1f2c; opacity: 0.6; border: 1px solid #334155; }
     .schedule-date-badge.past-badge { background-color: #64748b; color: #e2e8f0; box-shadow: none; }
-    .schedule-title-text.past-title { color: #94a3b8; text-decoration: line-through; }
+    .schedule-title-text.past-title { color: #94a3b8; text-decoration: none !important; }
 
     .gift-card { background-color: #0f172a; border: 1px solid #334155; border-radius: 14px; padding: 12px; text-align: center; margin-bottom: 15px; }
     .gift-img-container { width: 100%; height: 160px; overflow: hidden; border-radius: 10px; background-color: #020617; margin-bottom: 8px; }
@@ -584,15 +584,16 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 except:
                                     pass
                                 
+                                # ปรับแต่งโครงสร้าง: หากเป็นงานที่ผ่านมาแล้ว จะเปลี่ยนเป็นแค่การใช้คลาสสีเทาหม่น (.past-event) โดยไม่มีคำสร้อยและไม่มีสไตล์ขีดฆ่าตัวหนังสือ
                                 box_class = "schedule-item-box past-event" if is_past else "schedule-item-box"
                                 badge_style = "background-color: #64748b; color:#fff; box-shadow: none;" if is_past else "background-color: #3b82f6; color:#fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);"
-                                title_style = "color: #94a3b8; font-size: 19px; text-decoration: line-through;" if is_past else "color: #60a5fa; font-size: 19px;"
+                                title_style = "color: #94a3b8; font-size: 19px;" if is_past else "color: #60a5fa; font-size: 19px;"
                                 
                                 st.markdown(f"""
                                 <div class="{box_class}">
                                     <div class="schedule-date-badge" style="{badge_style}">{display_day}</div>
                                     <div class="schedule-content-info">
-                                        <div class="schedule-title-text" style="{title_style}">{ev.get('รายการ', '-')} {" (ผ่านไปแล้ว)" if is_past else ""}</div>
+                                        <div class="schedule-title-text" style="{title_style}">{ev.get('รายการ', '-')}</div>
                                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-top: 8px;">
                                             <div class="schedule-meta-row" style="font-size: 14px;">⏰ <b>เวลา:</b> {ev.get('เวลา', '-')}</div>
                                             <div class="schedule-meta-row-two-lines" style="font-size: 14px;">📍 <b>สถานที่ / ช่องรับชม:</b> {ev.get('สถานที่/ช่อง', '-')}</div>
