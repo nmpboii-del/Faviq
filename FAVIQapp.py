@@ -62,11 +62,15 @@ def save_system_config(config_data):
 
 sys_config = load_system_config()
 
-# --- ฟังก์ชันระบบจัดการตารางงานศิลปิน ---
+# --- ฟังก์ชันระบบจัดการตารางงานศิลปิน (เพิ่มระบบ Auto-Sort เรียงวันที่) ---
 def load_event_schedules():
     if os.path.exists(EVENT_SCHEDULE_FILE):
         try:
             df = pd.read_csv(EVENT_SCHEDULE_FILE)
+            # แปลงเป็น datetime ชั่วคราวเพื่อทำการจัดเรียงวันที่จากปัจจุบันไปอนาคตอย่างถูกต้อง
+            df['date_parsed'] = pd.to_datetime(df['วันที่'], errors='coerce')
+            df = df.sort_values(by='date_parsed', ascending=True)
+            df = df.drop(columns=['date_parsed'])
             return df.to_dict('records')
         except:
             return []
@@ -74,6 +78,19 @@ def load_event_schedules():
 
 def save_event_schedules(data):
     pd.DataFrame(data).to_csv(EVENT_SCHEDULE_FILE, index=False, encoding='utf-8-sig')
+
+# ฟังก์ชันดึงเฉพาะ "เลขวัน" ออกมาจากฟอร์แมตวันที่มาตรฐาน YYYY-MM-DD
+def extract_only_day_num(date_str):
+    if not date_str or pd.isna(date_str):
+        return "-"
+    try:
+        # แยกชิ้นส่วนจาก 2026-07-27 ให้เหลือแค่ 27
+        parts = str(date_str).split('-')
+        if len(parts) == 3:
+            return str(int(parts[2])) # int ช่วยตัดเลข 0 ข้างหน้าออก เช่น 02 -> 2
+        return str(date_str)
+    except:
+        return str(date_str)
 
 # --- ฟังก์ชันระบบช่วยดึงข้อมูล ---
 def extract_youtube_id(url):
@@ -367,17 +384,17 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                             st.info("ยังไม่มีคลิปปักหมุดในขณะนี้")
                             
                     with col_dashboard_right:
-                        # 💡 ปรับปรุงส่วนหน้าหลักให้แสดงตารางงานแค่ 3 วันที่ใกล้ที่สุดเท่านั้นตามที่ขอมา
                         st.markdown('<div class="yt-shelf-title">📅 ตารางงานศิลปิน (3 วันล่าสุด)</div>', unsafe_allow_html=True)
                         event_list = load_event_schedules()
                         if event_list:
                             upcoming_events = event_list[:3]
                             for ev in upcoming_events:
-                                event_date_str = str(ev.get('วันที่', '-')).replace('.0', '')
+                                # 💡 ดึงเฉพาะตัวเลขวันที่เดี่ยวๆ ไปแสดงผลตามโจทย์ป้าย Badge ลบปัญหาเลขเบิ้ล
+                                display_day = extract_only_day_num(ev.get('วันที่', '-'))
                                 note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
                                 st.markdown(f"""
                                 <div class="schedule-item-box">
-                                    <div class="schedule-date-badge">{event_date_str}</div>
+                                    <div class="schedule-date-badge">{display_day}</div>
                                     <div class="schedule-content-info">
                                         <div class="schedule-title-text">{ev.get('รายการ', '-')}</div>
                                         <div class="schedule-meta-row">⏰ <b>Time:</b> {ev.get('เวลา', '-')}</div>
@@ -505,20 +522,18 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </a>
                                 """, unsafe_allow_html=True)
 
-                # 💡 เพิ่ม Logic การทำงานของแท็บตารางงานเดี่ยวเต็มรูปแบบ (เมื่อผู้ใช้กดสร้างแท็บข้อมูลนี้)
                 elif t_type == "artist_events_all":
                     st.markdown('<div class="yt-shelf-title">🗓️ คลังข้อมูลตารางงานศิลปินทั้งหมด</div>', unsafe_allow_html=True)
                     event_list = load_event_schedules()
                     if not event_list:
                         st.info("ขณะนี้ไม่มีข้อมูลตารางงานในระบบ")
                     else:
-                        # แบ่งการแสดงผลเป็นแบบแถวยาวเต็มหน้ากระดาษอ่านง่าย
                         for ev in event_list:
-                            event_date_str = str(ev.get('วันที่', '-')).replace('.0', '')
+                            display_day = extract_only_day_num(ev.get('วันที่', '-'))
                             note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
                             st.markdown(f"""
                             <div class="schedule-item-box" style="margin-bottom: 20px;">
-                                <div class="schedule-date-badge" style="background-color: #3b82f6; color:#fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);">{event_date_str}</div>
+                                <div class="schedule-date-badge" style="background-color: #3b82f6; color:#fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);">{display_day}</div>
                                 <div class="schedule-content-info">
                                     <div class="schedule-title-text" style="color: #60a5fa; font-size: 19px;">{ev.get('รายการ', '-')}</div>
                                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-top: 8px;">
@@ -550,7 +565,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
         st.success("🔓 ยืนยันตัวตนสำเร็จ!")
         st.markdown("---")
         
-        # --- กำหนดตัวแปรสำหรับจำค่าการแก้ไข (State) ---
         if "edit_index" not in st.session_state: st.session_state.edit_index = None
         if "edit_gift_index" not in st.session_state: st.session_state.edit_gift_index = None
         if "edit_event_index" not in st.session_state: st.session_state.edit_event_index = None
@@ -592,7 +606,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
             st.markdown("### ➕ เพิ่มแท็บเมนูใหม่เข้าสู่หน้าหลัก")
             with st.form(key="create_new_tab_form"):
                 new_tab_title = st.text_input("ระบุชื่อแท็บใหม่ที่ต้องการให้แสดง:")
-                # 💡 จุดนี้คือจุดเพิ่มตัวเลือกประเภทข้อมูลใหม่ "คลังตารางงานศิลปินทั้งหมด" ลงใน Dropdown ของผู้ใช้งานตามรูปภาพ image_365789.png ครับ
                 new_tab_content_type = st.selectbox(
                     "ระบุประเภทข้อมูลที่จะนำมาแสดงในแท็บนี้:",
                     [
@@ -697,7 +710,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
         # =========================================================================
-        # 🗓️ ส่วนสำหรับจัดการข้อมูลตารางงานศิลปิน
+        # 🗓️ ส่วนจัดการตารางงานศิลปิน (แก้ไขระบบ Input เป็นแบบปฏิทินกด)
         # =========================================================================
         with st.expander("🗓️ จัดการตารางงานศิลปิน (เพิ่ม/แก้ไข/ลบตารางงานปัจจุบัน)"):
             current_events_list = load_event_schedules()
@@ -705,7 +718,11 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
             if st.session_state.edit_event_index is not None:
                 st.markdown("### 📝 แก้ไขรายการตารางงาน")
                 ev_curr = current_events_list[st.session_state.edit_event_index]
-                default_ev_date = ev_curr.get("วันที่", "")
+                # แปลงข้อความวันที่ใน CSV ให้กลับมาเป็น Object วันที่ของ Python เพื่อป้อนเข้าช่องปฏิทิน
+                try:
+                    default_ev_date = datetime.datetime.strptime(str(ev_curr.get("วันที่", "")), "%Y-%m-%d").date()
+                except:
+                    default_ev_date = datetime.date.today()
                 default_ev_title = ev_curr.get("รายการ", "")
                 default_ev_time = ev_curr.get("เวลา", "")
                 default_ev_location = ev_curr.get("สถานที่/ช่อง", "")
@@ -713,11 +730,13 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 event_btn_txt = "🔄 อัปเดตตารางงาน"
             else:
                 st.markdown("### ➕ เพิ่มรายการตารางงานใหม่")
-                default_ev_date, default_ev_title, default_ev_time, default_ev_location, default_ev_note = "", "", "", "", ""
+                default_ev_date = datetime.date.today()
+                default_ev_title, default_ev_time, default_ev_location, default_ev_note = "", "", "", ""
                 event_btn_txt = "💾 บันทึกตารางงาน"
                 
             with st.form(key="add_event_schedule_form", clear_on_submit=False):
-                ev_date = st.text_input("วันที่ (เช่น 02, 11 Update, 19):", value=default_ev_date)
+                # 💡 เปลี่ยนจากช่องกรอกข้อความเป็น "ปฏิทินให้คลิกเลือกวัน" แม่นยำ ไร้กังวลเรื่องพิมพ์ผิดฟอร์แมต
+                ev_date = st.date_input("เลือกวันที่จัดงาน:", value=default_ev_date)
                 ev_title = st.text_input("รายการ / ชื่องาน:", value=default_ev_title)
                 ev_time = st.text_input("เวลา (เช่น 21:45 น. หรือ 15.30):", value=default_ev_time)
                 ev_location = st.text_input("สถานที่ / ช่องทางการรับชม:", value=default_ev_location)
@@ -726,7 +745,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 
                 if submit_event and ev_title.strip():
                     item_event_data = {
-                        "วันที่": clean_html_tags(ev_date),
+                        "วันที่": str(ev_date), # เซฟลงไฟล์ CSV เป็นฟอร์แมตสากล YYYY-MM-DD เพื่อให้เอาไปเรียงลำดับวันง่ายๆ
                         "รายการ": clean_html_tags(ev_title),
                         "เวลา": clean_html_tags(ev_time),
                         "สถานที่/ช่อง": clean_html_tags(ev_location),
@@ -749,15 +768,15 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     st.rerun()
             
             st.markdown("---")
-            st.markdown("### 📋 ตารางงานทั้งหมดที่มีในระบบ")
+            st.markdown("### 📋 ตารางงานทั้งหมดที่มีในระบบ (จัดเรียงวันอัตโนมัติแล้ว)")
             if not current_events_list:
                 st.info("ขณะนี้ยังไม่มีรายการตารางงาน")
             else:
                 for ev_idx, ev_item in enumerate(current_events_list):
                     col_ev_info, col_ev_actions = st.columns([3.5, 1.5])
                     with col_ev_info:
-                        event_date_str = str(ev_item.get('วันที่', '-')).replace('.0', '')
-                        st.write(f"**[{event_date_str}] {ev_item.get('รายการ', '-')}** \n<br><span style='color:#facc15; font-size:12px;'>⏰ เวลา: {ev_item.get('เวลา', '-')} | 📍 สถานที่/ช่อง: {ev_item.get('สถานที่/ช่อง', '-')} | 💬 หมายเหตุ: {ev_item.get('หมายเหตุ', '-')}</span>", unsafe_allow_html=True)
+                        display_day = extract_only_day_num(ev_item.get('วันที่', '-'))
+                        st.write(f"**[{display_day}] {ev_item.get('รายการ', '-')}** \n<br><span style='color:#facc15; font-size:12px;'>📅 วันที่เต็ม: {ev_item.get('วันที่', '-')} | ⏰ เวลา: {ev_item.get('เวลา', '-')} | 📍 สถานที่/ช่อง: {ev_item.get('สถานที่/ช่อง', '-')} | 💬 หมายเหตุ: {ev_item.get('หมายเหตุ', '-')}</span>", unsafe_allow_html=True)
                     with col_ev_actions:
                         act_c1, act_c2 = st.columns(2)
                         if act_c1.button("📝 แก้ไข", key=f"edit_ev_btn_{ev_idx}"):
