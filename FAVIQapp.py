@@ -5,8 +5,15 @@ from PIL import Image   # ไลบรารีสำหรับจัดกา
 import base64           # ไลบรารีสำหรับเข้ารหัสไฟล์เป็น base64
 
 # ตั้งค่าหน้า Streamlit
+fav_icon = Image.open("images/pageicon.png") 
 st.set_page_config(
-    page_title="Artist Schedule Tracker",  # ชื่อหน้าเว็บ
+    page_title="Artist Schedule Tracker",
+    page_icon=fav_icon,  # ดึงภาพจากโฟลเดอร์ images มาใช้เป็นไอคอน ✨
+    layout="centered"
+)
+
+st.set_page_config(
+    page_title="Artist Schedule Tracke",  # ชื่อหน้าเว็บ
     page_icon="✨",                         # ไอคอนแสดงบนแท็บเบราว์เซอร์
     layout="centered"                       # การจัดวางเนื้อหาให้อยู่ตรงกลางหน้าจอ
 )
