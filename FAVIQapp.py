@@ -727,7 +727,10 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 for ev_idx, ev_item in enumerate(current_events_list):
                     col_ev_info, col_ev_actions = st.columns([3.5, 1.5])
                     with col_ev_info:
-                        st.write(f"**[{ev_item.get('วันที่', '-').replace('.0', '')}] {ev_item.get('รายการ', '-')}** \n<br><span style='color:#facc15; font-size:12px;'>⏰ เวลา: {ev_item.get('เวลา', '-')} | 📍 สถานที่/ช่อง: {ev_item.get('สถานที่/ช่อง', '-')} | 💬 หมายเหตุ: {ev_item.get('หมายเหตุ', '-')}</span>", unsafe_allow_html=True)
+                        #  โค้ดที่แก้ไขแล้ว (แปลงเป็น str ก่อนสั่ง replace)
+event_date_str = str(ev_item.get('วันที่', '-')).replace('.0', '')
+
+st.write(f"**[{event_date_str}] {ev_item.get('รายการ', '-')}** \n<br><span style='color:#facc15; font-size:12px;'>⏰ เวลา: {ev_item.get('เวลา', '-')} | 📍 สถานที่/ช่อง: {ev_item.get('สถานที่/ช่อง', '-')} | 💬 หมายเหตุ: {ev_item.get('หมายเหตุ', '-')}</span>", unsafe_allow_html=True)
                     with col_ev_actions:
                         act_c1, act_c2 = st.columns(2)
                         if act_c1.button("📝 แก้ไข", key=f"edit_ev_btn_{ev_idx}"):
