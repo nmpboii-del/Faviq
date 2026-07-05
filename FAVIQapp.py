@@ -543,7 +543,7 @@ if view_mode == "🏠 HOME":
                         st.info("ขณะนี้ยังไม่มีข้อมูลวิดีโอในระบบ")
 
                 elif t_type == "single_shelf_only":
-                    st.markdown(f'<div class="yt-shelf-title">📂 หมวดหมู่: {t_target}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="yt-shelf-title">📂 : {t_target}</div>', unsafe_allow_html=True)
                     df_shelf = df_vids[df_vids['type'] == t_target] if not df_vids.empty else pd.DataFrame()
                     if df_shelf.empty:
                         st.caption("ยังไม่มีข้อมูลวิดีโอในหมวดหมู่นี้")
