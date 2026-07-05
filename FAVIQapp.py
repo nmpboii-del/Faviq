@@ -28,6 +28,7 @@ MV_FILE = "mv_highlight.csv"
 GIFTS_FILE = "fan_gifts.csv"      
 MESSAGES_FILE = "fan_messages.csv" 
 CONFIG_FILE = "system_config.json"  
+EVENT_SCHEDULE_FILE = "artist_event_schedule.csv"  # ไฟล์เก็บตารางงานศิลปินเพิ่มใหม่
 
 ADMIN_PASSWORD = "Nittaya_195"
 
@@ -60,6 +61,19 @@ def save_system_config(config_data):
         json.dump(config_data, f, ensure_ascii=False, indent=4)
 
 sys_config = load_system_config()
+
+# --- ฟังก์ชันระบบจัดการตารางงานศิลปิน (เพิ่มใหม่) ---
+def load_event_schedules():
+    if os.path.exists(EVENT_SCHEDULE_FILE):
+        try:
+            df = pd.read_csv(EVENT_SCHEDULE_FILE)
+            return df.to_dict('records')
+        except:
+            return []
+    return []
+
+def save_event_schedules(data):
+    pd.DataFrame(data).to_csv(EVENT_SCHEDULE_FILE, index=False, encoding='utf-8-sig')
 
 # --- ฟังก์ชันระบบช่วยดึงข้อมูล ---
 def extract_youtube_id(url):
@@ -316,29 +330,47 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 """, unsafe_allow_html=True)
 
                 elif t_type == "home_dashboard":
-                    # 🛠️ ย้าย "ผลงานแนะนำยอดนิยม (ปักหมุด)" มาไว้ด้านบนสุดเป็นอันดับที่ 1
-                    pinned_vids = [v for v in all_vids if v.get('pinned', False)]
-                    if pinned_vids:
-                        st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม</div>', unsafe_allow_html=True)
-                        pv_cols = st.columns(4)
-                        for pv_idx, pv_item in enumerate(pinned_vids[:4]):
-                            with pv_cols[pv_idx % 4]:
-                                thumb = get_youtube_thumbnail(pv_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
-                                click_url = pv_item['link'] if pv_item['link'] and not pd.isna(pv_item['link']) else "#"
-                                note_html = f'<div style="font-size:12px; color:#f59e0b; font-style:italic; margin-top:2px;">💬 {pv_item["note"]}</div>' if ('note' in pv_item and pv_item['note'] and not pd.isna(pv_item['note'])) else ''
-                                st.markdown(f"""
-                                <a href="{click_url}" target="_blank" class="yt-video-card-link">
-                                    <div class="yt-video-card">
-                                        <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
-                                        <div class="yt-video-details">
-                                            <div class="yt-video-title">📌 {pv_item["title"]}</div>
-                                            <div class="yt-video-channel">👤 {pv_item.get('channel', 'Official Channel')}</div>
-                                            <div class="yt-video-meta">📅 {pv_item["date"]}</div>
-                                            {note_html}
+                    # 🛠️ แบ่งเป็น 2 ส่วน ซ้าย-ขวา (ฝั่งซ้าย: คลิปปักหมุดเต็มๆ | ฝั่งขวา: ตารางงานศิลปิน)
+                    col_dashboard_left, col_dashboard_right = st.columns([1, 1])
+                    
+                    with col_dashboard_left:
+                        pinned_vids = [v for v in all_vids if v.get('pinned', False)]
+                        st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม (คลิปปักหมุด)</div>', unsafe_allow_html=True)
+                        if pinned_vids:
+                            pv_cols = st.columns(2)  # ปรับเป็น 2 คอลัมน์ย่อยเพื่อให้การแสดงผลในบล็อกฝั่งซ้ายสวยงามและใหญ่เต็มตา
+                            for pv_idx, pv_item in enumerate(pinned_vids):
+                                with pv_cols[pv_idx % 2]:
+                                    thumb = get_youtube_thumbnail(pv_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                                    click_url = pv_item['link'] if pv_item['link'] and not pd.isna(pv_item['link']) else "#"
+                                    note_html = f'<div style="font-size:12px; color:#f59e0b; font-style:italic; margin-top:2px;">💬 {pv_item["note"]}</div>' if ('note' in pv_item and pv_item['note'] and not pd.isna(pv_item['note'])) else ''
+                                    st.markdown(f"""
+                                    <a href="{click_url}" target="_blank" class="yt-video-card-link">
+                                        <div class="yt-video-card">
+                                            <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
+                                            <div class="yt-video-details">
+                                                <div class="yt-video-title">📌 {pv_item["title"]}</div>
+                                                <div class="yt-video-channel">👤 {pv_item.get('channel', 'Official Channel')}</div>
+                                                <div class="yt-video-meta">📅 {pv_item["date"]}</div>
+                                                {note_html}
+                                            </div>
                                         </div>
-                                    </div>
-                                </a>
-                                """, unsafe_allow_html=True)
+                                    </a>
+                                    """, unsafe_allow_html=True)
+                        else:
+                            st.info("ยังไม่มีคลิปปักหมุดในขณะนี้")
+                            
+                    with col_dashboard_right:
+                        st.markdown('<div class="yt-shelf-title">📅 ตารางงานศิลปิน</div>', unsafe_allow_html=True)
+                        event_list = load_event_schedules()
+                        if event_list:
+                            df_events = pd.DataFrame(event_list)
+                            # เรียงลำดับตามความสวยงามและการนำไปใช้งาน
+                            df_events_display = df_events[['วันที่', 'รายการ', 'เวลา', 'สถานที่/ช่อง', 'หมายเหตุ']]
+                            st.dataframe(df_events_display, use_container_width=True, hide_index=True)
+                        else:
+                            st.info("ยังไม่มีข้อมูลตารางงานในระบบ สามารถเพิ่มข้อมูลได้ผ่านระบบหลังบ้าน")
+
+                    st.markdown("---")
 
                     # 🛠️ ย้าย "ล่าสุดจาก Digital Goods" ลงมาอยู่เป็นอันดับที่ 2
                     if gifts_list:
@@ -613,6 +645,47 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     g_c1.write(f"{g_i + 1}. {g_item['title']}")
                     if g_c3.button("📝", key=f"edit_g_{g_i}"): st.session_state.edit_gift_index = g_i; st.rerun()
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
+
+        # =========================================================================
+        # 🗓️ [เพิ่มใหม่] ส่วนสำหรับจัดการกรอกข้อมูลตารางงานศิลปิน
+        # =========================================================================
+        with st.expander("🗓️ จัดการตารางงานศิลปิน (เพิ่ม/ลบตารางงานปัจจุบัน)"):
+            st.markdown("### ➕ เพิ่มรายการตารางงานใหม่")
+            with st.form(key="add_event_schedule_form", clear_on_submit=True):
+                ev_date = st.text_input("วันที่ (เช่น 02, 11 Update, 19 หรือระบุเต็มรูปแบบ):")
+                ev_title = st.text_input("รายการ / ชื่องาน:")
+                ev_time = st.text_input("เวลา (เช่น 21:45 น. หรือ 15.30):")
+                ev_location = st.text_input("สถานที่ / ช่องทางการรับชม:")
+                ev_note = st.text_input("หมายเหตุเล็กๆ:")
+                submit_event = st.form_submit_button("💾 บันทึกตารางงาน")
+                
+                if submit_event and ev_title.strip():
+                    current_events = load_event_schedules()
+                    current_events.append({
+                        "วันที่": clean_html_tags(ev_date),
+                        "รายการ": clean_html_tags(ev_title),
+                        "เวลา": clean_html_tags(ev_time),
+                        "สถานที่/ช่อง": clean_html_tags(ev_location),
+                        "หมายเหตุ": clean_html_tags(ev_note)
+                    })
+                    save_event_schedules(current_events)
+                    st.success("เพิ่มข้อมูลลงตารางงานสำเร็จแล้ว!")
+                    st.rerun()
+            
+            st.markdown("---")
+            st.markdown("### 📋 ตารางงานทั้งหมดที่มีในระบบ")
+            current_events_list = load_event_schedules()
+            if not current_events_list:
+                st.info("ขณะนี้ยังไม่มีรายการตangerschaft")
+            else:
+                for ev_idx, ev_item in enumerate(current_events_list):
+                    col_ev_info, col_ev_del = st.columns([4, 1])
+                    col_ev_info.write(f"**[{ev_item.get('วันที่', '-')}] {ev_item.get('รายการ', '-')}** | เวลา: {ev_item.get('เวลา', '-')} | สถานที่/ช่อง: {ev_item.get('สถานที่/ช่อง', '-')} | หมายเหตุ: {ev_item.get('หมายเหตุ', '-')}")
+                    if col_ev_del.button("🗑️ ลบงานนี้", key=f"del_ev_btn_{ev_idx}"):
+                        current_events_list.pop(ev_idx)
+                        save_event_schedules(current_events_list)
+                        st.success("ลบรายการสำเร็จ!")
+                        st.rerun()
 
         # =========================================================================
         # 🎬 4. ส่วนจัดระเบียบวิดีโอ (อัปเดตรองรับ ID มีขีดกลาง และป้องกันปัญหากล่องว่าง)
