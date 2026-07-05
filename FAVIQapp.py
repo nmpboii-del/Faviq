@@ -224,29 +224,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
 
         df_vids = pd.DataFrame(all_vids).sort_values(by='date', ascending=False) if all_vids else pd.DataFrame()
 
-        # -----------------------------------------------------------------
-        # ✨ [เพิ่มใหม่] 🎬 แผงรายชื่อแบบแถวแนวตั้ง (แสดงภาพรวมรายการอัปเดตล่าสุด)
-        # -----------------------------------------------------------------
-        st.markdown('<div class="shelf-title">🎬 อัปเดตตารางผลงานล่าสุด (แถวแนวตั้งเรียงตามวัน)</div>', unsafe_allow_html=True)
-        if df_vids.empty:
-            st.caption("ไม่มีรายการอัปเดตในระบบ")
-        else:
-            # คัด 5 รายการล่าสุดมาโชว์ในลิสต์แนวตั้งหน้าร้านเพื่อความคลีน
-            recent_vids = df_vids.head(5).to_dict('records')
-            for r_item in recent_vids:
-                note_str = f" ({r_item['note']})" if r_item['note'] and not pd.isna(r_item['note']) else ""
-                st.markdown(f"""
-                <div class="vertical-list-row">
-                    <div style="color:#f8fafc; font-size:14px;">
-                        📅 <b>{r_item['date']}</b> — 【{r_item['type']}】 <b>{r_item['title']}</b> <span style="color:#94a3b8; font-style:italic;">{note_str}</span>
-                    </div>
-                    <div>
-                        <a style="background-color:#38bdf8; color:#0f172a !important; padding:4px 12px; font-size:12px; font-weight:bold; border-radius:6px; text-decoration:none;" href="{r_item['link']}" target="_blank">▶ ดูข้อมูล</a>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
-
         # --------------------------------------------------
         # 🎨 ชั้นวางปกติที่ 1: 🎨 ของแจกสำหรับแฟนๆ ทั้งหมด (แนวนอน)
         # --------------------------------------------------
