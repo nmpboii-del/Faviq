@@ -34,7 +34,8 @@ ADMIN_PASSWORD = "Nittaya_195"
 
 # 🖼️ ใส่ URL ของรูปภาพขนาด 1500*1500 ที่ต้องการใช้เป็นรูปส่วนหัวเพจตรงนี้
 # (สามารถเปลี่ยนเป็น Path ของไฟล์ในเครื่องได้ เช่น "images/header.png")
-HEADER_IMAGE_URL = "images/headpage.jpg" 
+from PIL import Image
+HEADER_IMAGE_URL = Image.open("images/headpage.jpg")
 
 # --- ฟังก์ชันจัดการโครงสร้างหัวข้อ/หมวดหมู่ระบบ ---
 def load_system_config():
