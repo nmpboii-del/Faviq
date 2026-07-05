@@ -242,8 +242,10 @@ st.markdown(
     .schedule-date-badge { flex-shrink: 0; width: 75px; height: 75px; background-color: #facc15; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: #000; box-shadow: 0 4px 10px rgba(250, 204, 21, 0.2); margin-right: 18px; text-align: center; line-height: 1; }
     .schedule-content-info { flex-grow: 1; color: #f1f5f9; }
     .schedule-title-text { font-size: 17px; font-weight: 700; color: #facc15; margin-bottom: 6px; }
-    .schedule-meta-row { font-size: 14px; color: #cbd5e1; display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
-    .schedule-note-text { font-size: 12px; color: #94a3b8; font-style: italic; margin-top: 4px; }
+    .schedule-meta-row { font-size: 14px; color: #cbd5e1; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .schedule-meta-row-two-lines { font-size: 14px; color: #cbd5e1; margin-bottom: 4px; }
+    .schedule-indent-text { padding-left: 20px; color: #f1f5f9; font-weight: 500; word-break: break-all; }
+    .schedule-note-text { font-size: 12px; color: #94a3b8; font-style: italic; margin-top: 6px; }
 
     .gift-card { background-color: #0f172a; border: 1px solid #334155; border-radius: 14px; padding: 12px; text-align: center; margin-bottom: 15px; }
     .gift-img-container { width: 100%; height: 160px; overflow: hidden; border-radius: 10px; background-color: #020617; margin-bottom: 8px; }
@@ -349,7 +351,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 thumb = get_youtube_thumbnail(pv_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
                                 click_url = pv_item['link'] if pv_item['link'] and not pd.isna(pv_item['link']) else "#"
                                 note_html = f'<div style="font-size:14px; color:#f59e0b; font-style:italic; margin-top:5px;">💬 {pv_item["note"]}</div>' if ('note' in pv_item and pv_item['note'] and not pd.isna(pv_item['note'])) else ''
-                                # ปรับโครงสร้างแบบการ์ดเดียวใหญ่เต็มฝั่งซ้าย ไม่แยกคอลัมน์ย่อย
                                 st.markdown(f"""
                                 <a href="{click_url}" target="_blank" class="yt-video-card-link">
                                     <div class="yt-video-card" style="margin-bottom: 25px;">
@@ -372,13 +373,17 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         if event_list:
                             for ev in event_list:
                                 note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
+                                # 🛠️ อัปเดตโครงสร้าง HTML ตรงนี้ แยกหัวข้อ Location ไว้บรรทัดบน และเคาะข้อมูลสถานที่ลงไปเยื้องบรรทัดล่าง
                                 st.markdown(f"""
                                 <div class="schedule-item-box">
                                     <div class="schedule-date-badge">{ev.get('วันที่', '-')}</div>
                                     <div class="schedule-content-info">
                                         <div class="schedule-title-text">{ev.get('รายการ', '-')}</div>
                                         <div class="schedule-meta-row">⏰ <b>Time:</b> {ev.get('เวลา', '-')}</div>
-                                        <div class="schedule-meta-row">📍 <b>Location/Channel:</b> {ev.get('สถานที่/ช่อง', '-')}</div>
+                                        <div class="schedule-meta-row-two-lines">
+                                            📍 <b>Location/Channel:</b>
+                                            <div class="schedule-indent-text">{ev.get('สถานที่/ช่อง', '-')}</div>
+                                        </div>
                                         {note_snippet}
                                     </div>
                                 </div>
@@ -704,7 +709,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         st.rerun()
 
         # =========================================================================
-        # 🎬 4. ส่วนจัดระเบียบวิดีโอ (อัปเดตรองรับ ID มีขีดกลาง และป้องกันปัญหากล่องว่าง)
+        # 🎬 4. ส่วนจัดระเบียบวิดีโอ
         # =========================================================================
         with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
             st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
