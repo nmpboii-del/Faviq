@@ -372,18 +372,47 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         if live_schedules_list:
                             html_content = '<div class="schedule-container">'
                             for s_item in live_schedules_list:
-                                try:
-                                    day_num = datetime.datetime.strptime(s_item['date'], "%Y-%m-%d").strftime("%d")
-                                except:
-                                    day_num = "🗓️"
-                                note_txt = f'<div class="schedule-note">* {s_item["note"]}</div>' if s_item.get('note') else ''
+                                # จัดการดึงค่าเลขวันที่ให้ยืดหยุ่น รองรับทั้งแบบ 2026-07-11 หรือคีย์เลข 11, 19 เฉดปกติ
+                                raw_date = str(s_item.get('date', '')).strip()
+                                if '-' in raw_date:
+                                    try:
+                                        day_num = datetime.datetime.strptime(raw_date, "%Y-%m-%d").strftime("%d")
+                                    except:
+                                        day_num = raw_date
+                                else:
+                                    day_num = raw_date if raw_date and raw_date.lower() != 'nan' else "🗓️"
+
+                                # ป้องกันปัญหาฟิลด์ว่างหรือค่า NaN โผล่กวนโครงสร้าง HTML
+                                s_title = s_item.get('title', '')
+                                s_title = "" if pd.isna(s_title) or str(s_title).lower() == 'nan' else str(s_title)
+
+                                s_location = s_item.get('location', '')
+                                s_location = "" if pd.isna(s_location) or str(s_location).lower() == 'nan' else str(s_location)
+
+                                # ตรวจสอบและแปลงรูปแบบการแสดงผลของช่องเวลาให้ฉลาดขึ้น
+                                raw_time = s_item.get('time', '')
+                                if pd.isna(raw_time) or str(raw_time).lower() == 'nan' or not str(raw_time).strip():
+                                    time_html = ""
+                                elif any(ch in str(raw_time) for ch in ['รอ', 'ติดตาม', 'แจ้ง', 'ทีหลัง', 'รายละเอียด']):
+                                    # หากพิมพ์เป็นข้อความเช่น "ติดตามรายละเอียดได้จากทางผู้จัด" จะไม่แสดงคำว่า Time น. ด้านหลังให้เกะกะ
+                                    time_html = f'<div class="schedule-meta-text">⏰ <b>Time:</b> {raw_time}</div>'
+                                else:
+                                    # หากพิมพ์เป็นตัวเลขเวลาปกติ จะใส่ น. ปิดท้ายให้ตามโครงสร้างระบบเดิม
+                                    time_html = f'<div class="schedule-meta-text">⏰ <b>Time:</b> {raw_time} น.</div>'
+
+                                s_note = s_item.get('note', '')
+                                if pd.isna(s_note) or str(s_note).lower() == 'nan' or not str(s_note).strip():
+                                    note_txt = ''
+                                else:
+                                    note_txt = f'<div class="schedule-note">* {s_note}</div>'
+
                                 html_content += f"""
                                 <div class="schedule-item">
                                     <div class="schedule-date-box">{day_num}</div>
                                     <div class="schedule-info">
-                                        <div class="schedule-title">{s_item['title']}</div>
-                                        <div class="schedule-meta-text">⏰ <b>Time:</b> {s_item['time']}</div>
-                                        <div class="schedule-meta-text">📍 <b>Location/Channel:</b> {s_item['location']}</div>
+                                        <div class="schedule-title">{s_title}</div>
+                                        {time_html}
+                                        <div class="schedule-meta-text">📍 <b>Location/Channel:</b> {s_location}</div>
                                         {note_txt}
                                     </div>
                                 </div>
