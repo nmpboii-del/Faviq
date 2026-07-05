@@ -6,6 +6,7 @@ import requests
 import time
 import datetime
 import base64
+import json  # เพิ่มการโหลด json สำหรับเก็บค่าคอนฟิกหัวข้อ
 
 # ตั้งค่าหน้า Streamlit
 try:
@@ -26,8 +27,40 @@ INFO_FILE = "important_info.txt"
 MV_FILE = "mv_highlight.csv"
 GIFTS_FILE = "fan_gifts.csv"      
 MESSAGES_FILE = "fan_messages.csv" 
+CONFIG_FILE = "system_config.json"  # ไฟล์ใหม่สำหรับเก็บหัวข้อและหมวดหมู่
 
 ADMIN_PASSWORD = "Nittaya_195"
+
+# --- ฟังก์ชันจัดการโครงสร้างหัวข้อ/หมวดหมู่ระบบ ---
+def load_system_config():
+    default_config = {
+        "tabs": {
+            "home": "หน้าแรก",
+            "videos": "วิดีโอทั้งหมด",
+            "gifts": "🎨 Digital Goods",
+            "letters": "💌 ส่งข้อความ"
+        },
+        "video_shelves": [
+            {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
+            {"type": "Online Video / YouTube", "title": "🔴 คลิปออนไลน์ / YouTube & Social Media Content"},
+            {"type": "Event / Concert", "title": "🎤 งานอีเวนต์และคอนเสิร์ต / Live Events & Concerts"},
+            {"type": "Radio / Podcast", "title": "📻 รายการวิทยุและพอดแคสต์ / Radio & Podcasts"}
+        ]
+    }
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return default_config
+    return default_config
+
+def save_system_config(config_data):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config_data, f, ensure_ascii=False, indent=4)
+
+# โหลดค่าคอนฟิกหัวข้อเข้าสู่ระบบ
+sys_config = load_system_config()
 
 # --- ฟังก์ชันระบบช่วยดึงข้อมูล ---
 def extract_youtube_id(url):
@@ -41,14 +74,9 @@ def get_youtube_thumbnail(url):
     return f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg" if video_id else None
 
 def fetch_youtube_details(url):
-    """ฟังก์ชันอัปเกรดใหม่: ดึงชื่อคลิป ชื่อช่อง และวันที่ออนแอร์จาก YouTube"""
     video_id = extract_youtube_id(url)
     default_date = datetime.date.today()
-    
-    if not video_id:
-        return "วิดีโอไม่ระบุชื่อ", "Unknown Channel", default_date
-    
-    # วิธีที่ 1: ดึงผ่าน oEmbed API 
+    if not video_id: return "วิดีโอไม่ระบุชื่อ", "Unknown Channel", default_date
     try:
         embed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
         res = requests.get(embed_url, timeout=5)
@@ -56,44 +84,23 @@ def fetch_youtube_details(url):
             data = res.json()
             title = data.get("title", "วิดีโอ YouTube")
             channel = data.get("author_name", "Official Channel")
-            # โน้ต: oEmbed มักไม่มีวันที่มาตรงๆ จึงเตรียม fallback ไปหาในวิธีที่ 2 ต่อหากต้องการวันที่แม่นยำ
-    except:
-        pass
-
-    # วิธีที่ 2: ดึงจากหน้าเว็บตรงๆ (ใช้ดึงวันที่เผยแพร่)
+    except: pass
     try:
         watch_url = f"https://www.youtube.com/watch?v={video_id}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept-Language": "th-TH,th;q=0.9"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept-Language": "th-TH,th;q=0.9"}
         res = requests.get(watch_url, headers=headers, timeout=5)
         if res.status_code == 200:
-            # หาชื่อคลิป
             title_match = re.search(r'<title>(.*?)</title>', res.text)
-            if title_match:
-                title = title_match.group(1).replace(" - YouTube", "").strip()
-            
-            # หาชื่อช่อง
+            if title_match: title = title_match.group(1).replace(" - YouTube", "").strip()
             channel_match = re.search(r'"ownerChannelName":"([^"]+)"', res.text)
-            if not channel_match:
-                channel_match = re.search(r'"author":"([^"]+)"', res.text)
-            if channel_match:
-                channel = channel_match.group(1).strip()
-            
-            # หาการอัปโหลด/วันที่เผยแพร่ (มักอยู่ในฟอร์แมต YYYY-MM-DD)
-            date_match = re.search(r'"publishDate":"([^"]+)"', res.text)
-            if not date_match:
-                date_match = re.search(r'"uploadDate":"([^"]+)"', res.text)
-            if not date_match:
-                date_match = re.search(r'<meta itemprop="datePublished" content="([^"]+)"', res.text)
-                
+            if not channel_match: channel_match = re.search(r'"author":"([^"]+)"', res.text)
+            if channel_match: channel = channel_match.group(1).strip()
+            date_match = re.search(r'"publishDate":"([^"]+)"', res.text) or re.search(r'"uploadDate":"([^"]+)"', res.text) or re.search(r'<meta itemprop="datePublished" content="([^"]+)"', res.text)
             if date_match:
-                parsed_date = date_match.group(1)[:10] # ตัดเอาเฉพาะ YYYY-MM-DD
+                parsed_date = date_match.group(1)[:10]
                 default_date = datetime.datetime.strptime(parsed_date, "%Y-%m-%d").date()
-                
             return title, channel, default_date
-    except:
-        pass
-        
-    # คืนค่าตัวแปรกรณีแกะได้บางส่วน หรือไม่ได้เลย
+    except: pass
     try: return title, channel, default_date
     except: return "วิดีโอ YouTube", "Official Channel", default_date
 
@@ -165,7 +172,6 @@ def load_data():
             if 'pinned' not in df.columns: df['pinned'] = False
             else: df['pinned'] = df['pinned'].astype(bool)
             if 'channel' not in df.columns: df['channel'] = "Official Channel"
-            
             records = df.to_dict('records')
             for r in records:
                 r['title'] = clean_html_tags(r.get('title', ''))
@@ -173,8 +179,7 @@ def load_data():
                 if pd.isna(r.get('channel')) or r.get('channel') == "":
                     r['channel'] = "Official Channel"
             return records
-        except:
-            return []
+        except: return []
     return []
 
 def save_data(data): pd.DataFrame(data).to_csv(DATA_FILE, index=False, encoding='utf-8-sig')
@@ -198,61 +203,15 @@ st.markdown(
     .billboard-box { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); border-left: 6px solid #ef4444; padding: 20px; border-radius: 14px; color: #f1f5f9; margin-bottom: 25px; border: 1px solid #1e293b; }
     .mv-dashboard-box { background-color: #0b0f19; border: 1px solid #38bdf8; border-radius: 18px; padding: 20px; margin-bottom: 30px; }
     
-    .yt-video-card-link {
-        text-decoration: none !important;
-        color: inherit !important;
-        display: block;
-        margin-bottom: 20px;
-    }
-    .yt-video-card {
-        background-color: transparent;
-        transition: transform 0.2s ease;
-    }
-    .yt-video-card:hover {
-        transform: scale(1.02);
-    }
-    .yt-thumbnail-container {
-        position: relative;
-        width: 100%;
-        padding-top: 56.25%; 
-        overflow: hidden;
-        border-radius: 12px;
-        background-color: #000;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-    }
-    .yt-thumbnail-img {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    .yt-video-details {
-        margin-top: 10px;
-        padding: 0 2px;
-    }
-    .yt-video-title {
-        font-size: 14px;
-        font-weight: 600;
-        color: #f8fafc;
-        line-height: 1.3;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        margin-bottom: 4px;
-    }
-    .yt-video-channel {
-        font-size: 12px;
-        color: #ef4444; 
-        font-weight: 500;
-        margin-bottom: 2px;
-    }
-    .yt-video-meta {
-        font-size: 12px;
-        color: #94a3b8;
-    }
+    .yt-video-card-link { text-decoration: none !important; color: inherit !important; display: block; margin-bottom: 20px; }
+    .yt-video-card { background-color: transparent; transition: transform 0.2s ease; }
+    .yt-video-card:hover { transform: scale(1.02); }
+    .yt-thumbnail-container { position: relative; width: 100%; padding-top: 56.25%; overflow: hidden; border-radius: 12px; background-color: #000; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    .yt-thumbnail-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+    .yt-video-details { margin-top: 10px; padding: 0 2px; }
+    .yt-video-title { font-size: 14px; font-weight: 600; color: #f8fafc; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
+    .yt-video-channel { font-size: 12px; color: #ef4444; font-weight: 500; margin-bottom: 2px; }
+    .yt-video-meta { font-size: 12px; color: #94a3b8; }
     
     .gift-card { background-color: #0f172a; border: 1px solid #334155; border-radius: 14px; padding: 12px; text-align: center; margin-bottom: 15px; }
     .gift-img-container { width: 100%; height: 160px; overflow: hidden; border-radius: 10px; background-color: #020617; margin-bottom: 8px; }
@@ -263,22 +222,14 @@ st.markdown(
     .yt-play-all { font-size: 14px; color: #94a3b8; font-weight: normal; cursor: pointer; text-decoration: none; }
     .letter-card { background-color: #1e293b; border-left: 4px solid #ef4444; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
     
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 24px;
-        border-bottom: 1px solid #2d3748;
-    }
-    .stTabs [data-baseweb="tab"] {
-        font-size: 16px;
-        font-weight: 600;
-        padding-bottom: 8px;
-        background-color: transparent !important;
-    }
+    .stTabs [data-baseweb="tab-list"] { gap: 24px; border-bottom: 1px solid #2d3748; }
+    .stTabs [data-baseweb="tab"] { font-size: 16px; font-weight: 600; padding-bottom: 8px; background-color: transparent !important; }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-view_mode = st.sidebar.radio("MENU", ["🏠 หน้าแรก", "⚙️ ระบบ"])
+view_mode = st.sidebar.radio("MENU", ["🏠 หน้าแรก", "⚙️ ระบบหลังบ้าน"])
 
 # ==========================================
 # 🏠 หน้าแรกแกลเลอรี
@@ -318,12 +269,18 @@ if view_mode == "🏠 หน้าแรก":
             st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 เวลาที่อัปเดตล่าสุด(อัปเดตทุก 10 นาที): {update_str} น.</span>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    tab_home, tab_videos, tab_gifts, tab_letters = st.tabs(["หน้าแรก", "วิดีโอทั้งหมด", "🎨 Digital Goods", "💌 ส่งข้อความ"])
+    # ดึงหัวข้อแท็บที่ตั้งค่าจากหลังบ้าน
+    tab_labels = sys_config.get("tabs", {})
+    tab_home, tab_videos, tab_gifts, tab_letters = st.tabs([
+        tab_labels.get("home", "หน้าแรก"),
+        tab_labels.get("videos", "วิดีโอทั้งหมด"),
+        tab_labels.get("gifts", "🎨 Digital Goods"),
+        tab_labels.get("letters", "💌 ส่งข้อความ")
+    ])
     
     # ---- TAB 1: หน้าแรก ----
     with tab_home:
         pinned_vids = [v for v in all_vids if v.get('pinned', False)]
-        
         if pinned_vids:
             st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม <span class="yt-play-all">▶ ดูทั้งหมด</span></div>', unsafe_allow_html=True)
             pv_cols = st.columns(4)
@@ -351,7 +308,7 @@ if view_mode == "🏠 หน้าแรก":
                     """, unsafe_allow_html=True)
                     
         if gifts_list:
-            st.markdown('<div class="yt-shelf-title">🎨 Digital Goods</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="yt-shelf-title">{tab_labels.get("gifts", "🎨 Digital Goods")}</div>', unsafe_allow_html=True)
             g_home_cols = st.columns(4)
             for g_idx, g_item in enumerate(gifts_list[:4]):
                 with g_home_cols[g_idx % 4]:
@@ -369,10 +326,8 @@ if view_mode == "🏠 หน้าแรก":
                     """, unsafe_allow_html=True)
 
         if not df_vids.empty:
-            homepage_shelves = [
-                {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
-                {"type": "Online Video / YouTube", "title": "🔴 คลิปออนไลน์ / YouTube & Social Media Content"}
-            ]
+            # ดึงเฉพาะ 2 หมวดหมู่แรกไปโชว์ที่หน้าแรก (หรือทั้งหมดตามลิสต์)
+            homepage_shelves = sys_config.get("video_shelves", [])[:2]
             for shelf in homepage_shelves:
                 df_shelf = df_vids[df_vids['type'] == shelf['type']]
                 if not df_shelf.empty:
@@ -403,13 +358,7 @@ if view_mode == "🏠 หน้าแรก":
 
     # ---- TAB 2: วิดีโอทั้งหมด ----
     with tab_videos:
-        video_shelves = [
-            {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
-            {"type": "Online Video / YouTube", "title": "🔴 คลิปออนไลน์ / YouTube & Social Media Content"},
-            {"type": "Event / Concert", "title": "🎤 งานอีเวนต์และคอนเสิร์ต / Live Events & Concerts"},
-            {"type": "Radio / Podcast", "title": "📻 รายการวิทยุและพอดแคสต์ / Radio & Podcasts"}
-        ]
-        
+        video_shelves = sys_config.get("video_shelves", [])
         for shelf in video_shelves:
             st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
             if df_vids.empty: 
@@ -420,7 +369,7 @@ if view_mode == "🏠 หน้าแรก":
                     st.caption("ยังไม่มีวิดีโอในหมวดหมู่นี้")
                 else:
                     shelf_records = df_shelf.to_dict('records')
-                    state_key = f"show_all_{shelf['type'].replace(' ', '_')}"
+                    state_key = f"show_all_{shelf['type'].replace(' ', '_').replace('/', '_')}"
                     if state_key not in st.session_state: st.session_state[state_key] = False
                     
                     display_vids = shelf_records if st.session_state[state_key] else shelf_records[:4]
@@ -456,7 +405,7 @@ if view_mode == "🏠 หน้าแรก":
 
     # ---- TAB 3 & 4 ----
     with tab_gifts:
-        st.markdown('<div class="yt-shelf-title">🎨 Digital Goods</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="yt-shelf-title">{tab_labels.get("gifts", "🎨 Digital Goods")}</div>', unsafe_allow_html=True)
         if not gifts_list: st.caption("ขณะนี้ยังไม่มีรูปภาพของแจกเปิดให้ดาวน์โหลด")
         else:
             g_cols = st.columns(4)
@@ -476,7 +425,7 @@ if view_mode == "🏠 หน้าแรก":
                     """, unsafe_allow_html=True)
 
     with tab_letters:
-        st.markdown("<h3 style='color: #ef4444; margin-top:10px;'>💌 กล่องจดหมาย</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #ef4444; margin-top:10px;'>{tab_labels.get('letters', '💌 ส่งข้อความ')}</h3>", unsafe_allow_html=True)
         with st.form(key="fan_message_form_v8", clear_on_submit=True):
             fan_name = st.text_input("ชื่อเล่นของคุณ:")
             fan_msg = st.text_area("ข้อความที่คุณอยากฝากถึงแอดมิน:")
@@ -498,6 +447,66 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
         
         if "edit_index" not in st.session_state: st.session_state.edit_index = None
         if "edit_gift_index" not in st.session_state: st.session_state.edit_gift_index = None
+
+        # 🆕 เพิ่มฟังก์ชันแก้ไขหัวข้อเมนูแท็บด้านบน และเพิ่ม/ลดหมวดหมู่วิดีโอ
+        with st.expander("🛠️ [เมนูใหม่] จัดการหัวข้อเว็บและหมวดหมู่เนื้อหา (Dynamic Headers)"):
+            st.markdown("#### 1. แก้ไขชื่อแท็บเมนูด้านบน")
+            c_t1, c_t2 = st.columns(2)
+            with c_t1:
+                new_home_tab = st.text_input("แท็บที่ 1:", value=sys_config["tabs"].get("home", "หน้าแรก"))
+                new_gifts_tab = st.text_input("แท็บที่ 3:", value=sys_config["tabs"].get("gifts", "🎨 Digital Goods"))
+            with c_t2:
+                new_vids_tab = st.text_input("แท็บที่ 2:", value=sys_config["tabs"].get("videos", "วิดีโอทั้งหมด"))
+                new_letters_tab = st.text_input("แท็บที่ 4:", value=sys_config["tabs"].get("letters", "💌 ส่งข้อความ"))
+            
+            st.markdown("---")
+            st.markdown("#### 2. จัดการหมวดหมู่ประเภทวิดีโอ (Video Shelves)")
+            
+            # ฟอร์มเพิ่มหมวดหมู่ใหม่
+            with st.form(key="add_shelf_form"):
+                st.markdown("**➕ เพิ่มหมวดหมู่ใหม่**")
+                new_type_id = st.text_input("รหัสประเภทหมวดหมู่ (ภาษาอังกฤษ เช่น On-stage / Dance):")
+                new_type_title = st.text_input("ชื่อแสดงผลหมวดหมู่ (พร้อม Emoji เช่น 🕺 เต้น / Coreography):")
+                add_shelf_submit = st.form_submit_button("➕ เพิ่มหมวดหมู่")
+                if add_shelf_submit and new_type_id.strip() and new_type_title.strip():
+                    # ตรวจสอบตัวซ้ำ
+                    exists = any(s['type'] == new_type_id.strip() for s in sys_config["video_shelves"])
+                    if not exists:
+                        sys_config["video_shelves"].append({"type": new_type_id.strip(), "title": new_type_title.strip()})
+                        sys_config["tabs"] = {"home": new_home_tab, "videos": new_vids_tab, "gifts": new_gifts_tab, "letters": new_letters_tab}
+                        save_system_config(sys_config)
+                        st.success("เพิ่มหมวดหมู่เรียบร้อย!")
+                        st.rerun()
+                    else:
+                        st.error("มีรหัสหมวดหมู่นี้อยู่ในระบบแล้ว")
+
+            # ตารางรายการหมวดหมู่ปัจจุบันที่มีสิทธิ์ให้ลบออกได้
+            st.markdown("**📋 รายการหมวดหมู่ในระบบปัจจุบัน (สามารถเรียงและลบได้)**")
+            temp_shelves = list(sys_config["video_shelves"])
+            for s_idx, s_item in enumerate(temp_shelves):
+                col_s1, col_s2, col_s3 = st.columns([1.5, 2, 0.5])
+                col_s1.text(f"ID: {s_item['type']}")
+                # ให้แอดมินแก้ไขชื่อภาษาไทยหน้างานได้เลย
+                updated_title = col_s2.text_input(f"ชื่อแสดงผลสำหรับ {s_item['type']}", value=s_item['title'], key=f"shelf_title_{s_idx}")
+                sys_config["video_shelves"][s_idx]["title"] = updated_title
+                
+                if col_s3.button("🗑️", key=f"del_shelf_{s_idx}"):
+                    sys_config["video_shelves"].pop(s_idx)
+                    sys_config["tabs"] = {"home": new_home_tab, "videos": new_vids_tab, "gifts": new_gifts_tab, "letters": new_letters_tab}
+                    save_system_config(sys_config)
+                    st.success("ลบหมวดหมู่สำเร็จ!")
+                    st.rerun()
+
+            if st.button("💾 บันทึกการตั้งค่าหัวข้อทั้งหมด", key="save_all_headers_btn"):
+                sys_config["tabs"] = {
+                    "home": new_home_tab,
+                    "videos": new_vids_tab,
+                    "gifts": new_gifts_tab,
+                    "letters": new_letters_tab
+                }
+                save_system_config(sys_config)
+                st.success("บันทึกโครงสร้างระบบหัวข้อใหม่ทั้งหมดเรียบร้อยแล้ว!")
+                st.rerun()
 
         with st.expander("🎯 1. ตั้งค่าเพลงโปรเจกต์โฟกัส"):
             curr_mv = load_mv_highlight()
@@ -554,7 +563,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
 
         # 🎬 4. จัดการคลังวิดีโอทั่วไป
         with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
-            
             st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
             yt_fetch_link = st.text_input("วางลิงก์ YouTube ตรงนี้เพื่อดึงข้อมูลอัตโนมัติ:")
             if st.button("🔍 ดึงชื่อคลิป ชื่อช่อง และวันที่ออนแอร์"):
@@ -571,6 +579,10 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
 
             st.markdown("---")
 
+            # ดึงประเภทข้อมูลมาจากระบบ config เพื่อสร้างลิสต์ตัวเลือกแบบ Dynamic
+            available_options = [s["type"] for s in sys_config.get("video_shelves", [])]
+            if not available_options: available_options = ["Variety / TV"]
+
             col_v_form, col_v_manage = st.columns([1, 1.2])
             with col_v_form:
                 if st.session_state.edit_index is not None:
@@ -581,12 +593,10 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     d_pinned = bool(curr.get('pinned', False))
                     try: d_date = datetime.datetime.strptime(curr["date"], "%Y-%m-%d").date()
                     except: d_date = datetime.date.today()
-                    options = ["Variety / TV", "Online Video / YouTube", "Event / Concert", "Radio / Podcast"]
-                    d_type_idx = options.index(curr["type"]) if curr["type"] in options else 0
+                    d_type_idx = available_options.index(curr["type"]) if curr["type"] in available_options else 0
                     btn_txt = "🔄 อัปเดตวิดีโอ"
                 else:
                     st.markdown("**➕ เพิ่มวิดีโอใหม่**")
-                    # เรียกใช้ค่าที่ดึงมาจากระบบอัตโนมัติ
                     d_title = st.session_state.get("temp_fetched_title", "")
                     d_channel = st.session_state.get("temp_fetched_channel", "")
                     d_date = st.session_state.get("temp_fetched_date", datetime.date.today())
@@ -600,7 +610,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     title = st.text_input("ชื่อคลิป:", value=d_title)
                     channel = st.text_input("ชื่อช่องต้นทาง:", value=d_channel)
                     date_val = st.date_input("วันที่ออนแอร์:", value=d_date)
-                    w_type = st.selectbox("ประเภท:", ["Variety / TV", "Online Video / YouTube", "Event / Concert", "Radio / Podcast"], index=d_type_idx)
+                    w_type = st.selectbox("ประเภท:", available_options, index=d_type_idx)
                     link = st.text_input("ลิงก์คลิป:", value=d_link)
                     note = st.text_area("โน้ตย่อ:", value=d_note)
                     is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=d_pinned)
@@ -626,7 +636,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     else: 
                         st.session_state.schedules.append(item_data)
                     
-                    # ล้างค่ากล่องสเตทชั่วคราว
                     for k in ["temp_fetched_title", "temp_fetched_channel", "temp_fetched_date", "temp_fetched_link"]:
                         if k in st.session_state: del st.session_state[k]
                         
@@ -641,7 +650,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 st.markdown("**📋 รายการวิดีโอปัจจุบัน**")
                 for idx, item in enumerate(st.session_state.schedules):
                     v_c1, v_c2, v_c3, v_c4 = st.columns([2, 0.9, 0.6, 0.5])
-                    v_c1.write(f"{idx+1}. {item['title']} \n<br><span style='color:#ef4444; font-size:11px;'>👤 ช่อง: {item.get('channel', 'Official Channel')} | 📅 วันที่: {item['date']}</span>", unsafe_allow_html=True)
+                    v_c1.write(f"{idx+1}. {item['title']} \n<br><span style='color:#ef4444; font-size:11px;'>👤 ช่อง: {item.get('channel', 'Official Channel')} | 📂 หมวด: {item['type']}</span>", unsafe_allow_html=True)
                     v_pin_val = item.get('pinned', False)
                     v_pin_lbl = "📌 หมุดอยู่" if v_pin_val else "◽ ทั่วไป"
                     if v_c2.button(v_pin_lbl, key=f"quick_pin_v_{idx}"): item['pinned'] = not v_pin_val; save_data(st.session_state.schedules); st.rerun()
