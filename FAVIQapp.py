@@ -270,17 +270,29 @@ if view_mode == "🏠 หน้าแรก":
     st.markdown('</div>', unsafe_allow_html=True)
     
     # --- ดึงรายชื่อแท็บแบบ Dynamic ตามที่ตั้งค่าจากหลังบ้าน ---
+    # --- ดึงรายชื่อแท็บแบบ Dynamic ตามที่ตั้งค่าจากหลังบ้าน ---
     defined_tabs = sys_config.get("tabs", [])
-    if not defined_tabs:
-        st.warning("ยังไม่ได้ตั้งค่าแท็บเมนูในระบบหลังบ้าน")
+    
+    # กรองข้อมูลเฉพาะที่เป็น dictionary และมี key 'title' เพื่อป้องกันบั๊ก TypeError
+    valid_tabs = []
+    if isinstance(defined_tabs, list):
+        for t in defined_tabs:
+            if isinstance(t, dict) and "title" in t:
+                valid_tabs.append(t)
+            elif isinstance(t, str):
+                # ป้องกันกรณีระบบเผลอเซฟเป็น string หลุดมา
+                valid_tabs.append({"id": f"tab_gen_{time.time()}", "title": str(t), "type": "all_videos", "target": ""})
+
+    if not valid_tabs:
+        st.warning("ยังไม่ได้ตั้งค่าแท็บเมนูในระบบหลังบ้าน หรือโครงสร้างข้อมูลไม่ถูกต้อง")
     else:
-        # สร้างแท็บแบบไดนามิกตามจำนวนในลิสต์
-        tab_objects = st.tabs([t["title"] for t in defined_tabs])
+        # สร้างแท็บแบบไดนามิกตามจำนวนในลิสต์ที่กรองแล้ว
+        tab_objects = st.tabs([t["title"] for t in valid_tabs])
         
-        for index, tab_info in enumerate(defined_tabs):
+        for index, tab_info in enumerate(valid_tabs):
             with tab_objects[index]:
-                t_type = tab_info.get("type")
-                t_target = tab_info.get("target")
+                t_type = tab_info.get("type", "all_videos")
+                t_target = tab_info.get("target", "")
                 
                 # ฟังก์ชันแสดงผลตามประเภทเนื้อหาของแท็บนั้นๆ
                 if t_type == "home_dashboard":
