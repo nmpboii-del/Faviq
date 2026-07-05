@@ -216,41 +216,41 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
     all_vids = load_data()
     df_vids = pd.DataFrame(all_vids).sort_values(by='date', ascending=False) if all_vids else pd.DataFrame()
     
+    # 1. บอร์ดประกาศสำคัญ
+    important_text = load_important_info()
+    st.markdown(f'<div class="billboard-box"><h4 style="margin-top:0; color:#ef4444; font-size:15px;">📢 ประกาศและข้อมูลสำคัญ</h4><p style="margin-bottom:0; font-size:13px; white-space: pre-wrap;">{important_text}</p></div>', unsafe_allow_html=True)
+    
+    # 2. แดชบอร์ดเพลงโปรเจกต์หลัก MV Focus
+    mv_data = load_mv_highlight()
+    st.markdown(f"### 🎵 PROJECT FOCUS: {mv_data['title']}")
+    st.markdown('<div class="mv-dashboard-box">', unsafe_allow_html=True)
+    col_mv_player, col_mv_milestone = st.columns([1.3, 1])
+    with col_mv_player:
+        yt_id = extract_youtube_id(mv_data['url'])
+        if yt_id: st.video(f"https://www.youtube.com/watch?v={yt_id}")
+        else: st.error("ลิงก์เพลงหลักไม่ถูกต้อง")
+    with col_mv_milestone:
+        st.markdown("<h4 style='color: #38bdf8; margin-top:0;'>📊 สถิติเป้าหมายอัตโนมัติ (อัปเดตทุก 1 ชม.)</h4>", unsafe_allow_html=True)
+        c_views, t_views = int(mv_data['current_views']), int(mv_data['target_views'])
+        progress_ratio = min(float(c_views / t_views), 1.0) if t_views > 0 else 0.0
+        st.columns(2)[0].metric(label="📈 ยอดวิวบน YouTube", value=f"{c_views:,} วิว")
+        st.columns(2)[1].metric(label="🎯 เป้าหมาย", value=f"{t_views:,} วิว")
+        st.markdown(f"**🔥 ความสำเร็จของโปรเจกต์: {progress_ratio*100:.2f}%**")
+        st.progress(progress_ratio)
+        if mv_data.get('last_updated', 0) > 0:
+            thailand_time = float(mv_data['last_updated']) + 25200 
+            update_str = datetime.datetime.fromtimestamp(thailand_time).strftime('%H:%M:%S')
+            st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 ข้อมูลเมื่อเวลา: {update_str} น.</span>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
     # --------------------------------------------------
-    # แท็บนำทางสไตล์ YouTube (หน้าแรก | วิดีโอ | ของแจก | จดหมาย)
+    # แท็บนำทางถูกย้ายมาอยู่ตรงนี้ (ใต้ Project Focus ตามสั่ง)
     # --------------------------------------------------
     tab_home, tab_videos, tab_gifts, tab_letters = st.tabs(["หน้าแรก", "วิดีโอทั้งหมด", "🎨 ของแจกสำหรับแฟนๆ", "💌 ส่งจดหมาย"])
     
     # ---- TAB 1: หน้าแรก ----
     with tab_home:
-        # 1. บอร์ดประกาศสำคัญ
-        important_text = load_important_info()
-        st.markdown(f'<div class="billboard-box"><h4 style="margin-top:0; color:#ef4444; font-size:15px;">📢 ประกาศและข้อมูลสำคัญ</h4><p style="margin-bottom:0; font-size:13px; white-space: pre-wrap;">{important_text}</p></div>', unsafe_allow_html=True)
-        
-        # 2. แดชบอร์ดเพลงโปรเจกต์หลัก MV Focus
-        mv_data = load_mv_highlight()
-        st.markdown(f"### 🎵 PROJECT FOCUS: {mv_data['title']}")
-        st.markdown('<div class="mv-dashboard-box">', unsafe_allow_html=True)
-        col_mv_player, col_mv_milestone = st.columns([1.3, 1])
-        with col_mv_player:
-            yt_id = extract_youtube_id(mv_data['url'])
-            if yt_id: st.video(f"https://www.youtube.com/watch?v={yt_id}")
-            else: st.error("ลิงก์เพลงหลักไม่ถูกต้อง")
-        with col_mv_milestone:
-            st.markdown("<h4 style='color: #38bdf8; margin-top:0;'>📊 สถิติเป้าหมายอัตโนมัติ (อัปเดตทุก 1 ชม.)</h4>", unsafe_allow_html=True)
-            c_views, t_views = int(mv_data['current_views']), int(mv_data['target_views'])
-            progress_ratio = min(float(c_views / t_views), 1.0) if t_views > 0 else 0.0
-            st.columns(2)[0].metric(label="📈 ยอดวิวบน YouTube", value=f"{c_views:,} วิว")
-            st.columns(2)[1].metric(label="🎯 เป้าหมาย", value=f"{t_views:,} วิว")
-            st.markdown(f"**🔥 ความสำเร็จของโปรเจกต์: {progress_ratio*100:.2f}%**")
-            st.progress(progress_ratio)
-            if mv_data.get('last_updated', 0) > 0:
-                thailand_time = float(mv_data['last_updated']) + 25200 
-                update_str = datetime.datetime.fromtimestamp(thailand_time).strftime('%H:%M:%S')
-                st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 ข้อมูลเมื่อเวลา: {update_str} น.</span>", unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # 3. โซนปักหมุดแนะนำพิเศษ (Pinned Highlights)
+        # โซนปักหมุดแนะนำพิเศษ (Pinned Highlights)
         pinned_gifts = [g for g in gifts_list if g.get('pinned', False)]
         pinned_vids = [v for v in all_vids if v.get('pinned', False)]
         
@@ -261,7 +261,9 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                 with pv_cols[pv_idx % 4]:
                     thumb = get_youtube_thumbnail(pv_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
                     click_url = pv_item['link'] if pv_item['link'] and not pd.isna(pv_item['link']) else "#"
-                    note_html = f'<div style="font-size:12px; color:#f59e0b; font-style:italic; margin-top:2px;">💬 {pv_item["note"]}</div>' if pv_item['note'] and not pd.isna(pv_item['note']) else ''
+                    
+                    # แก้ไขจุดที่ทำให้ HTML เออเร่อหลุดออกไปนอกการ์ด
+                    note_html = f'<div style="font-size:12px; color:#f59e0b; font-style:italic; margin-top:2px;">💬 {pv_item["note"]}</div>' if ('note' in pv_item and pv_item['note'] and not pd.isna(pv_item['note'])) else ''
                     
                     st.markdown(f"""
                     <a href="{click_url}" target="_blank" class="yt-video-card-link">
@@ -279,7 +281,26 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                     </a>
                     """, unsafe_allow_html=True)
                     
-        # 4. แสดงผลชั้นวางปกติ 2 หมวดหมู่ตัวอย่างในหน้าแรก
+        # ** เพิ่มหัวข้อของแจกแบบแนวนอน ต่อจากโซนแนะนำทันที **
+        if gifts_list:
+            st.markdown('<div class="yt-shelf-title">🎨 ของแจกสำหรับแฟนๆ / Fan Gifts</div>', unsafe_allow_html=True)
+            g_home_cols = st.columns(4)
+            for g_idx, g_item in enumerate(gifts_list[:4]): # แสดงผลตัวอย่างสูงสุด 4 ชิ้นแรกในหน้าแรก
+                with g_home_cols[g_idx % 4]:
+                    img_src = g_item['img_url']
+                    if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
+                    pin_badge = '<span style="color:#f59e0b; font-weight:bold;">📌 [แนะนำ]</span> ' if g_item.get('pinned', False) else ''
+                    st.markdown(f"""
+                    <div class="gift-card">
+                        <div class="gift-img-container">
+                            <img class="gift-img" src="{img_src}">
+                        </div>
+                        <div class="video-title" style="text-align:center; font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{pin_badge}{g_item["title"]}</div>
+                        <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        # แสดงผลชั้นวางปกติ 2 หมวดหมู่ตัวอย่างในหน้าแรก
         if not df_vids.empty:
             homepage_shelves = [
                 {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
@@ -294,7 +315,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         with v_cols[v_idx % 4]:
                             thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
                             click_url = v_item['link'] if v_item['link'] and not pd.isna(v_item['link']) else "#"
-                            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>' if v_item['note'] and not pd.isna(v_item['note']) else ''
+                            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>' if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])) else ''
                             
                             st.markdown(f"""
                             <a href="{click_url}" target="_blank" class="yt-video-card-link">
@@ -340,7 +361,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         with v_cols[v_idx % 4]:
                             thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
                             click_url = v_item['link'] if v_item['link'] and not pd.isna(v_item['link']) else "#"
-                            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>' if v_item['note'] and not pd.isna(v_item['note']) else ''
+                            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>' if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])) else ''
                             
                             st.markdown(f"""
                             <a href="{click_url}" target="_blank" class="yt-video-card-link">
@@ -381,7 +402,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         <div class="gift-img-container">
                             <img class="gift-img" src="{img_src}">
                         </div>
-                        <div class="video-title" style="text-align:center;">{pin_badge}{g_item["title"]}</div>
+                        <div class="video-title" style="text-align:center; font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{pin_badge}{g_item["title"]}</div>
                         <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
                     </div>
                     """, unsafe_allow_html=True)
