@@ -311,30 +311,31 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
             ]
             for shelf in homepage_shelves:
                 df_shelf = df_vids_home[df_vids_home['type'] == shelf['type']]
-                if not df_shelf.empty:
-                    st.markdown(f'<div class="yt-shelf-title">{shelf["title"]} <span class="yt-play-all">▶ เล่นทั้งหมด</span></div>', unsafe_allow_html=True)
-                    v_cols = st.columns(4)
-                    for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
-                        with v_cols[v_idx % 4]:
-                            thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
-                            click_url = v_item['link'] if v_item['link'] and not pd.isna(v_item['link']) else "#"
-                            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>' if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])) else ''
-                            
-                            st.markdown(f"""
-                            <a href="{click_url}" target="_blank" class="yt-video-card-link">
-                                <div class="yt-video-card">
-                                    <div class="yt-thumbnail-container">
-                                        <img class="yt-thumbnail-img" src="{thumb}">
-                                    </div>
-                                    <div class="yt-video-details">
-                                        <div class="yt-video-title">{v_item["title"]}</div>
-                                        <div class="yt-video-channel">Official Channel</div>
-                                        <div class="yt-video-meta">📅 {v_item["date"]}</div>
-                                        {note_html}
-                                    </div>
-                                </div>
-                            </a>
-                            """, unsafe_allow_html=True)
+                # แทนที่โค้ดเดิมในโซนแสดงผลชั้นวางปกติ 2 หมวดหมู่ตัวอย่างในหน้าแรก
+for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
+    with v_cols[v_idx % 4]:
+        thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+        click_url = v_item['link'] if v_item['link'] and not pd.isna(v_item['link']) else "#"
+        
+        # ปรับตรงนี้: ถักแท็กปิดการ์ด </ins></ins> เข้าไปอยู่ในเงื่อนไขให้จบในตัว
+        if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])):
+            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div></div></div>'
+        else:
+            note_html = '</div></div>'
+        
+        st.markdown(f"""
+        <a href="{click_url}" target="_blank" class="yt-video-card-link">
+            <div class="yt-video-card">
+                <div class="yt-thumbnail-container">
+                    <img class="yt-thumbnail-img" src="{thumb}">
+                </div>
+                <div class="yt-video-details">
+                    <div class="yt-video-title">{v_item["title"]}</div>
+                    <div class="yt-video-channel">Official Channel</div>
+                    <div class="yt-video-meta">📅 {v_item["date"]}</div>
+                    {note_html}
+        </a>
+        """, unsafe_allow_html=True)
 
     # ---- TAB 2: วิดีโอทั้งหมด (แยกหมวดหมู่จัดเต็ม + ระบบเรียงลำดับตามใจชอบ) ----
     with tab_videos:
