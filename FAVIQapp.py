@@ -227,7 +227,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ↩️ ย้ายเมนูเลือกโหมดกลับไปที่ Sidebar ซ้ายมือเหมือนเดิมตามต้องการ
+# ↩️ ย้ายเมนูเลือกโหมดกลับมาที่ Sidebar ตามคำขอเรียบร้อยครับ
 view_mode = st.sidebar.radio("MENU", ["🏠 หน้าแรกแกลเลอรี", "⚙️ ระบบหลังบ้าน"])
 
 # ==========================================
@@ -283,11 +283,30 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
         
         for index, tab_info in enumerate(valid_tabs):
             with tab_objects[index]:
-                # ตรวจเช็กทั้งฟิลด์ 'type' และตรวจสอบคำว่า 'digital_goods' เพื่อความแม่นยำสูง
+                t_title_text = str(tab_info.get("title", "")).lower()
                 t_type = str(tab_info.get("type", "")).strip()
                 t_target = tab_info.get("target", "")
                 
-                if t_type == "home_dashboard":
+                # ตรวจจับแบบครอบคลุม: ถ้าประเภทระบุชัด หรือชื่อแท็บเขียนว่า Digital Goods ให้วิ่งเข้าแกลเลอรีทันที ป้องกันปัญหารูปพัง
+                if t_type == "digital_goods" or "digital" in t_title_text or "good" in t_title_text or "gift" in t_title_text:
+                    st.markdown('<div class="yt-shelf-title">🎨 คลังดาวน์โหลดรูปภาพ Digital Goods ทั้งหมด</div>', unsafe_allow_html=True)
+                    if not gifts_list: 
+                        st.info("ขณะนี้ยังไม่มีรูปภาพเปิดให้ดาวน์โหลด สามารถเพิ่มรูปภาพได้จากระบบหลังบ้านครับ")
+                    else:
+                        g_cols = st.columns(4)
+                        for g_idx, g_item in enumerate(gifts_list):
+                            with g_cols[g_idx % 4]:
+                                img_src = g_item['img_url']
+                                if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
+                                st.markdown(f"""
+                                <div class="gift-card">
+                                    <div class="gift-img-container"><img class="gift-img" src="{img_src}"></div>
+                                    <div style="font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{g_item["title"]}</div>
+                                    <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                elif t_type == "home_dashboard":
                     # ✨ โชว์ Digital Goods ล่าสุด 4 อัน บนหน้าแรกสุด
                     if gifts_list:
                         st.markdown('<div class="yt-shelf-title">🎨 ล่าสุดจาก Digital Goods โหลดฟรี!</div>', unsafe_allow_html=True)
@@ -403,25 +422,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                         </div>
                                     </div>
                                 </a>
-                                """, unsafe_allow_html=True)
-
-                # 🛠️ จุดแก้ไขสำคัญ: ปลดล็อกเงื่อนไขตรวจสอบประเภทให้ดึงภาพของแจกทั้งหมดมาโชว์ในแท็บ Digital Goods แบบแยกต่างหากได้ 100%
-                elif t_type == "digital_goods" or "gift" in t_type or "goods" in t_type:
-                    st.markdown('<div class="yt-shelf-title">🎨 คลังดาวน์โหลดรูปภาพ Digital Goods ทั้งหมด</div>', unsafe_allow_html=True)
-                    if not gifts_list: 
-                        st.info("ขณะนี้ยังไม่มีรูปภาพเปิดให้ดาวน์โหลด สามารถเพิ่มรูปภาพได้จากระบบหลังบ้านครับ")
-                    else:
-                        g_cols = st.columns(4)
-                        for g_idx, g_item in enumerate(gifts_list):
-                            with g_cols[g_idx % 4]:
-                                img_src = g_item['img_url']
-                                if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
-                                st.markdown(f"""
-                                <div class="gift-card">
-                                    <div class="gift-img-container"><img class="gift-img" src="{img_src}"></div>
-                                    <div style="font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{g_item["title"]}</div>
-                                    <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
-                                </div>
                                 """, unsafe_allow_html=True)
 
                 elif t_type == "fan_letters":
@@ -588,16 +588,19 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
 
         with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
             st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
+            
+            # 🛠️ แยกช่องกรอกลิงก์กับปุ่มออกมานอก Form เพื่อไม่ให้โดน Streamlit รีเซ็ตค่ากลางทาง
             yt_fetch_link = st.text_input("วางลิงก์ YouTube ตรงนี้เพื่อดึงข้อมูลอัตโนมัติ:")
             if st.button("🔍 ดึงชื่อคลิป ชื่อช่อง และวันที่ออนแอร์"):
                 if yt_fetch_link.strip():
                     with st.spinner("กำลังแกะข้อมูลจากหลังบ้าน YouTube..."):
                         fetched_title, fetched_channel, fetched_date = fetch_youtube_details(yt_fetch_link)
-                        st.session_state["temp_fetched_title"] = fetched_title
-                        st.session_state["temp_fetched_channel"] = fetched_channel
-                        st.session_state["temp_fetched_date"] = fetched_date
-                        st.session_state["temp_fetched_link"] = yt_fetch_link
-                        st.success("ดึงข้อมูลสำเร็จ!")
+                        st.session_state["active_fetched_title"] = fetched_title
+                        st.session_state["active_fetched_channel"] = fetched_channel
+                        st.session_state["active_fetched_date"] = fetched_date
+                        st.session_state["active_fetched_link"] = yt_fetch_link
+                        st.success("ดึงข้อมูลสำเร็จ! ข้อมูลถูกนำไปหยอดในช่องกรอกด้านล่างแล้ว")
+                        st.rerun()
 
             st.markdown("---")
             available_options = [s["type"] for s in sys_config.get("video_shelves", [])]
@@ -615,14 +618,15 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     d_type_idx = available_options.index(curr["type"]) if curr["type"] in available_options else 0
                     btn_txt = "🔄 อัปเดตวิดีโอ"
                 else:
-                    d_title = st.session_state.get("temp_fetched_title", "")
-                    d_channel = st.session_state.get("temp_fetched_channel", "")
-                    d_date = st.session_state.get("temp_fetched_date", datetime.date.today())
-                    d_link = st.session_state.get("temp_fetched_link", "")
+                    # 🛠️ นำข้อมูลที่แกะได้จากระบบด่วนมาหยอดใส่ตรงนี้
+                    d_title = st.session_state.get("active_fetched_title", "")
+                    d_channel = st.session_state.get("active_fetched_channel", "")
+                    d_date = st.session_state.get("active_fetched_date", datetime.date.today())
+                    d_link = st.session_state.get("active_fetched_link", "")
                     d_note, d_pinned, d_type_idx = "", False, 0
                     btn_txt = "🚀 อัปโหลดเข้าคลัง"
                 
-                with st.form(key='admin_vid_exp_v8'):
+                with st.form(key='admin_vid_form_v9'):
                     title = st.text_input("ชื่อคลิป:", value=d_title)
                     channel = st.text_input("ชื่อช่องต้นทาง:", value=d_channel)
                     date_val = st.date_input("วันที่ออนแอร์:", value=d_date)
@@ -638,7 +642,9 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         st.session_state.schedules[st.session_state.edit_index] = item_data
                         st.session_state.edit_index = None
                     else: st.session_state.schedules.append(item_data)
-                    for k in ["temp_fetched_title", "temp_fetched_channel", "temp_fetched_date", "temp_fetched_link"]:
+                    
+                    # ล้างข้อมูลสเตตัสหลังบันทึกสำเร็จ
+                    for k in ["active_fetched_title", "active_fetched_channel", "active_fetched_date", "active_fetched_link"]:
                         if k in st.session_state: del st.session_state[k]
                     save_data(st.session_state.schedules); st.success("บันทึกข้อมูลสำเร็จ!"); st.rerun()
 
