@@ -1,193 +1,188 @@
 import streamlit as st  # นำเข้าไลบรารี Streamlit สำหรับสร้างเว็บแอป
-import joblib           # ใช้สำหรับโหลดและบันทึกโมเดล machine learning ที่ฝึกไว้แล้ว
-import numpy as np      # ไลบรารีสำหรับการคำนวณเชิงตัวเลข
-import sklearn          # ไลบรารีสำหรับ machine learning 
+import pandas as pd     # ใช้จัดการข้อมูลตารางและการบันทึกไฟล์ CSV
+import os               # ใช้สำหรับตรวจสอบที่อยู่ไฟล์
 from PIL import Image   # ไลบรารีสำหรับจัดการรูปภาพ
-import base64           # ไลบรารีสำหรับเข้ารหัสไฟล์เป็น base64 เพื่อแปลงภาพเป็น string สำหรับ HTML
+import base64           # ไลบรารีสำหรับเข้ารหัสไฟล์เป็น base64
 
 # ตั้งค่าหน้า Streamlit
 st.set_page_config(
-    page_title="Waste Type Classifier",  # ชื่อหน้าเว็บ
-    page_icon="🗑️",                 # ไอคอนแสดงบนแท็บเบราว์เซอร์
-    layout="centered"               # การจัดวางเนื้อหาให้อยู่ตรงกลางหน้าจอ
+    page_title="Artist Schedule Tracker",  # ชื่อหน้าเว็บ
+    page_icon="✨",                         # ไอคอนแสดงบนแท็บเบราว์เซอร์
+    layout="centered"                       # การจัดวางเนื้อหาให้อยู่ตรงกลางหน้าจอ
 )
 
-## โหลดโมเดลและ Vectorizer
-st.sidebar.info(f"เวอร์ชัน scikit-learn ที่ใช้งาน: {sklearn.__version__}")  
-# แสดงเวอร์ชันของ scikit-learn ที่ใช้ใน sidebar เพื่อให้ผู้ใช้ทราบ
+# ไฟล์สำหรับเก็บข้อมูลตารางงาน (อยู่ในโฟลเดอร์เดียวกับโค้ด)
+DATA_FILE = "artist_schedules.csv"
 
-try:
-    model = joblib.load("waste_model.pkl")          # โหลดโมเดลจำแนกประเภทขยะที่บันทึกไว้
-    vectorizer = joblib.load("vectorizer.pkl")      # โหลด Vectorizer สำหรับแปลงข้อความเป็นฟีเจอร์
-    st.sidebar.success("✅ โหลดโมเดลและ Vectorizer สำเร็จ!")  # แจ้งเตือนว่าโหลดสำเร็จ
-    
-    if hasattr(vectorizer, 'vocabulary_'):          # ตรวจสอบว่า Vectorizer มี attribute 'vocabulary_'
-        st.sidebar.info(f"Vectorizer คาดหวัง {len(vectorizer.vocabulary_)} features")  # แสดงจำนวนคำใน vocabulary
-    else:
-        st.sidebar.warning("Vectorizer ไม่มี attribute 'vocabulary_' ซึ่งอาจบ่งชี้ว่าไม่ได้ถูก fit มาอย่างสมบูรณ์")  
-        # แจ้งเตือนกรณี Vectorizer อาจไม่ถูกฝึกก่อนบันทึก
+# ฟังก์ชันโหลดข้อมูล
+def load_data():
+    if os.path.exists(DATA_FILE):
+        df = pd.read_csv(DATA_FILE)
+        # แปลงคอลัมน์ date เป็นสตริงเพื่อความง่ายในการจัดการ
+        df['date'] = df['date'].astype(str)
+        return df.to_dict('records')
+    return []
 
-except FileNotFoundError:
-    st.error("❌ ไม่พบไฟล์โมเดลหรือ Vectorizer โปรดตรวจสอบว่า 'waste_model.pkl' และ 'vectorizer.pkl' อยู่ในโฟลเดอร์เดียวกัน")  
-    # แจ้งข้อผิดพลาดหากไฟล์โมเดลหรือ Vectorizer ไม่พบในไดเรกทอรี
-    st.stop()  # หยุดการทำงานของแอปในกรณีนี้
-except Exception as e:
-    st.error(f"❌ เกิดข้อผิดพลาดในการโหลดโมเดลหรือ Vectorizer: {e}")  # แจ้งข้อผิดพลาดอื่น ๆ ที่อาจเกิดขึ้น
-    st.info("💡 ข้อผิดพลาดนี้อาจเกิดจากเวอร์ชัน scikit-learn ที่ไม่ตรงกัน หรือไฟล์เสียหาย")  # แนะนำสาเหตุ
-    st.stop()  # หยุดการทำงานของแอป
+# ฟังก์ชันบันทึกข้อมูล
+def save_data(data):
+    df = pd.DataFrame(data)
+    df.to_csv(DATA_FILE, index=False, encoding='utf-8-sig')
 
-CONFIDENCE_THRESHOLD = 0.3  # กำหนดค่าความมั่นใจต่ำสุดที่ยอมรับได้ในการจำแนกประเภท
+# โหลดข้อมูลเข้าสู่ Session State ตอนเปิดแอปครั้งแรก
+if "schedules" not in st.session_state:
+    st.session_state.schedules = load_data()
 
-# ส่วนหัวของแอปและการตกแต่ง UI
-HEADER_IMAGE_PATH = "C:/Users/hp/Documents/Study/AI/headder.png" # กำหนดพาธรูปภาพส่วนหัวของแอป
+# ส่วนหัวของแอปและการตกแต่ง UI (ใช้รูปภาพหัวเว็บเดิมของคุณ)
+HEADER_IMAGE_PATH = "C:/Users/hp/Documents/Study/AI/headder.png" 
 
 @st.cache_data  # cache ข้อมูลรูปภาพเพื่อไม่ให้โหลดซ้ำทุกครั้งที่มีการรีเฟรช
 def get_base64_of_bin_file(bin_file):
-    with open(bin_file, 'rb') as f:  # เปิดไฟล์ภาพแบบไบนารี่
-        data = f.read()              # อ่านข้อมูลไฟล์ทั้งหมด
-    return base64.b64encode(data).decode()  # แปลงข้อมูลเป็น base64 แล้วแปลงเป็น string
+    try:
+        with open(bin_file, 'rb') as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except FileNotFoundError:
+        return ""
 
-header_image_base64 = get_base64_of_bin_file(HEADER_IMAGE_PATH)  # ดึงข้อมูลรูปภาพในรูปแบบ base64
+header_image_base64 = get_base64_of_bin_file(HEADER_IMAGE_PATH)
 
-# ใช้ markdown เพื่อใส่ CSS สำหรับตกแต่งหน้าเว็บ และแสดงภาพพื้นหลังส่วนหัวเป็น base64
+# ปรับปรุงสไตล์ CSS ตามโครงสร้างเดิม เปลี่ยนโทนสีให้สดใสและเข้ากับศิลปิน
 st.markdown(
     f"""
     <style>
     .header-container {{
-        background-image: url("data:image/png;base64,{header_image_base64}"); /* ตั้งภาพพื้นหลังเป็น base64 */
-        background-size: cover;          /* ให้ภาพขยายเต็มพื้นที่ */
-        background-position: center;    /* จัดภาพให้อยู่กึ่งกลาง */
-        padding: 50px 20px;              /* กำหนดช่องว่างภายใน */
-        border-radius: 10px;             /* มุมโค้งมน */
-        text-align: center;              /* จัดข้อความกึ่งกลาง */
-        color: white;                   /* สีข้อความขาว */
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.0); /* เงาข้อความ (ในที่นี้ใส่โปร่งใส) */
-        margin-bottom: 30px;             /* เว้นช่องว่างด้านล่าง */
-        position: relative; 
-        overflow: hidden; 
-        min-height: 200px;               /* ความสูงขั้นต่ำ */
+        background-image: url("data:image/png;base64,{header_image_base64}");
+        background-size: cover;
+        background-position: center;
+        padding: 50px 20px;
+        border-radius: 10px;
+        text-align: center;
+        color: white;
+        margin-bottom: 30px;
+        min-height: 180px;
     }}
-    /* ปรับปรุงสีข้อความเป็นสีดำในช่อง input */
-    .stTextInput>div>div>input {{
-        background-color: #f0f2f6;       /* สีพื้นหลังช่อง input */
-        padding: 10px;                   /* ช่องว่างภายในช่อง input */
-        border-radius: 5px;              /* มุมโค้งมนของช่อง input */
-        border: 1px solid #ccc;          /* เส้นขอบสีเทาอ่อน */
-        color: black !important;         /* สีข้อความเป็นดำ แม้จะถูก override */
+    /* ปรับปรุงสีข้อความในช่อง input */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div {{
+        background-color: #f8fafc;
+        color: black !important;
     }}
+    /* สไตล์ปุ่มกดอัปเดตงาน */
     .stButton>button {{
-        background-color: #4CAF50;       /* สีปุ่มเป็นเขียว */
-        color: white;                    /* สีข้อความปุ่มเป็นขาว */
-        padding: 10px 20px;              /* ขนาดปุ่ม */
-        border-radius: 5px;              /* มุมโค้งมนของปุ่ม */
-        border: none;                   /* ไม่มีเส้นขอบ */
-        font-size: 1.1em;               /* ขนาดฟอนต์ */
-        cursor: pointer;                /* เปลี่ยนเคอร์เซอร์เมื่อชี้ */
+        background-color: #8B5CF6; /* สีม่วงสดใส */
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: none;
+        font-size: 1em;
+        width: 100%;
     }}
     .stButton>button:hover {{
-        background-color: #45a049;       /* สีปุ่มเมื่อ hover */
+        background-color: #7C3AED;
     }}
-    .result-box {{
-        padding: 20px;                   /* ช่องว่างภายในกล่องผลลัพธ์ */
-        border-radius: 10px;             /* มุมโค้งมน */
-        margin-top: 20px;                /* เว้นช่องว่างด้านบน */
-        font-size: 1.2em;                /* ขนาดฟอนต์ */
-        font-weight: bold;               /* ตัวหนา */
-        color: white;                   /* สีข้อความขาว */
-        text-align: center;              /* จัดข้อความกึ่งกลาง */
+    /* สไตล์การ์ดแสดงรายการงาน */
+    .schedule-card {{
+        background-color: white;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 15px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }}
-    .organic-bg {{ background-color: #339933; }} /* สีพื้นหลังเขียวสำหรับขยะอินทรีย์ */
-    .recycle-bg {{ background-color: #ffcc00; }} /* สีพื้นหลังเหลืองสำหรับขยะรีไซเคิล */
-    .hazardous-bg {{ background-color: #cc0000; }} /* สีพื้นหลังแดงสำหรับขยะอันตราย */
-    .general-bg {{ background-color: #336699; }} /* สีพื้นหลังน้ำเงินสำหรับขยะทั่วไป */
+    /* สไตล์ Tag แยกประเภท */
+    .badge {{
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.75em;
+        font-weight: bold;
+        display: inline-block;
+        margin-bottom: 8px;
+    }}
+    .bg-tv {{ background-color: #DBEAFE; color: #1E40AF; border: 1px solid #BFDBFE; }}
+    .bg-youtube {{ background-color: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }}
+    .bg-concert {{ background-color: #F3E8FF; color: #6B21A8; border: 1px solid #E9D5FF; }}
+    .bg-podcast {{ background-color: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }}
     </style>
     <div class="header-container">
-        </div>  <!-- ส่วนหัวมีภาพพื้นหลัง ไม่มีข้อความใดใน div นี้ -->
+    </div>
     """, 
-    unsafe_allow_html=True  # อนุญาตให้ใส่ HTML/ CSS โดยตรงใน markdown
+    unsafe_allow_html=True
 )
 
-# แสดงข้อความชี้แนะให้ผู้ใช้ป้อนรายละเอียดขยะเพื่อจำแนกประเภท
-st.write(
-    "กรุณาป้อนรายละเอียดของขยะเพื่อทำการจำแนกประเภท "
-    "ตัวอย่าง: ขวดพลาสติก, กระดาษหนังสือพิมพ์, เปลือกส้ม"
-)
+st.title("✨ My Artist Schedule Tracker")
+st.write("บันทึกและติดตามคลังตารางงาน คลิปย้อนหลัง หรือรายการที่ศิลปินไปออก")
 
-# ตรวจสอบว่า session state มีค่าเก็บข้อความอินพุตแล้วหรือไม่ ถ้ายังไม่มีตั้งเป็นค่าว่าง
-if "waste_description_input" not in st.session_state:
-    st.session_state.waste_description_input = ""
+# แบ่งหน้าจอเป็น 2 ฝั่ง: ฝั่งซ้ายกรอกฟอร์ม / ฝั่งขวาแสดงรายการงาน
+col_form, col_display = st.columns([1.2, 2])
 
-# Form Input
-# สร้างฟอร์มให้ผู้ใช้กรอกคำอธิบายขยะและปุ่มส่งข้อมูล
-with st.form(key='waste_classifier_form'):
-    text_input = st.text_input("ป้อนคำอธิบายของขยะที่นี่:", key="waste_description_input")
-    submit_button = st.form_submit_button("จำแนกประเภทขยะ")  # ปุ่มส่งฟอร์ม
+with col_form:
+    st.subheader("➕ เพิ่มรายการใหม่")
+    
+    with st.form(key='schedule_form', clear_on_submit=True):
+        title = st.text_input("ชื่อรายการ / งาน:", placeholder="เช่น เจาะใจ, คอนเสิร์ต Open Air")
+        date_val = st.date_input("วันที่ออกอากาศ / ไปงาน:")
+        work_type = st.selectbox("ประเภทงาน:", ["Variety / TV", "Online Video / YouTube", "Event / Concert", "Radio / Podcast"])
+        link = st.text_input("ลิงก์ (ถ้ามี):", placeholder="https://youtube.com/...")
+        note = st.text_area("บันทึกเพิ่มเติม:", placeholder="เช่น หล่อมาก, เมนร้องไฮโน้ตสะใจ...")
+        
+        submit_button = st.form_submit_button("บันทึกตารางงาน")
 
-# Logic การจำแนกและแสดงผลลัพธ์
-if submit_button:  # เมื่อผู้ใช้กดปุ่มส่งฟอร์ม
-    if not text_input.strip():  # ตรวจสอบว่ากรอกข้อความจริงหรือไม่ (ไม่ใช่แค่ช่องว่าง)
-        st.warning("⚠️ กรุณาป้อนข้อมูลในช่องข้อความ!")  # แจ้งเตือนให้กรอกข้อมูล
-    else:
-        X = vectorizer.transform([text_input])  # แปลงข้อความเป็น feature vector ด้วย vectorizer
-        
-        st.sidebar.info(f"Input ที่ถูกแปลงมี {X.shape[1]} features")  # แสดงจำนวน features ของ input
-        
-        # ตรวจสอบว่า features ของ input ตรงกับที่โมเดลคาดหวังหรือไม่
-        if hasattr(model, 'n_features_in_') and X.shape[1] != model.n_features_in_:
-            st.error(f"❌ จำนวน Features ของ Input ({X.shape[1]}) ไม่ตรงกับที่ Model คาดหวัง ({model.n_features_in_})")
-            st.info("💡 ปัญหานี้มักเกิดจากการที่ Vectorizer ที่ใช้โหลดมาไม่ตรงกับ Vectorizer ที่ใช้เทรนโมเดล")
-            st.stop()  # หยุดการทำงานถ้าไม่ตรงกัน
-        
-        probs = model.predict_proba(X)[0]  # ทำนายความน่าจะเป็นของแต่ละคลาส
-        max_prob = np.max(probs)            # ค่าความน่าจะเป็นสูงสุด
-        predicted_label = model.classes_[np.argmax(probs)]  # คลาสที่โมเดลทำนาย
-        
-        st.markdown("---")  # เส้นแบ่ง
-        
-        if max_prob < CONFIDENCE_THRESHOLD:  # ถ้าค่าความมั่นใจต่ำกว่ากำหนด
-            st.error("❌ ไม่ทราบประเภท กรุณาลองป้อนคำอธิบายขยะที่เฉพาะเจาะจงมากขึ้น")
+    # Logic เมื่อกดบันทึก
+    if submit_button:
+        if not title.strip():
+            st.warning("⚠️ กรุณากรอกชื่อรายการ!")
         else:
-            # กำหนดพาธรูปภาพ, คลาสสีพื้นหลัง และคำอธิบาย ตามผลการจำแนก
-            image_path = ""
-            bg_class = ""
-            description_text = ""
+            new_item = {
+                "title": title,
+                "date": str(date_val),
+                "type": work_type,
+                "link": link,
+                "note": note
+            }
+            # เพิ่มข้อมูลเข้าลิสต์และเซฟลงไฟล์
+            st.session_state.schedules.append(new_item)
+            save_data(st.session_state.schedules)
+            st.success("🎉 บันทึกตารางงานสำเร็จ!")
+            st.rerun()
 
-            if predicted_label == "ขยะอินทรีย์":
-                image_path = "C:/Users/hp/Documents/Study/AI/ถังขยะสีเขียว-Photoroom.png" 
-                bg_class = "organic-bg"
-                description_text = "🗑️ **ขยะอินทรีย์ / ขยะเปียก => ถังขยะสีเขียว:** คือขยะที่ย่อยสลายได้ตามธรรมชาติ เช่น เศษอาหาร ผัก ผลไม้ ใบไม้ กิ่งไม้ สามารถนำไปทำปุ๋ยหมักได้"
-            elif predicted_label == "ขยะรีไซเคิล":
-                image_path = "C:/Users/hp/Documents/Study/AI/ถังขยะสีเหลือง-Photoroom.png" 
-                bg_class = "recycle-bg"
-                description_text = "♻️ **ขยะรีไซเคิล => ถังขยะสีเหลือง:** คือขยะที่สามารถนำกลับมาใช้ใหม่ได้ เช่น ขวดพลาสติก แก้ว กระดาษ โลหะ ควรแยกประเภทและทำความสะอาดก่อนทิ้งเพื่อนำไปรีไซเคิล"
-            elif predicted_label == "ขยะอันตราย":
-                image_path = "C:/Users/hp/Documents/Study/AI/ถังขยะสีแดง-Photoroom.png" 
-                bg_class = "hazardous-bg"
-                description_text = "⚠️ **ขยะอันตราย / ขยะมีพิษ => ถังขยะสีแดง :** คือขยะที่มีสารพิษหรือเป็นอันตราย เช่น ถ่านไฟฉาย แบตเตอรี่ หลอดไฟ กระป๋องสเปรย์ สารเคมีต่างๆ ต้องทิ้งอย่างระมัดระวังและแยกจากขยะทั่วไป"
-            elif predicted_label == "ขยะทั่วไป":
-                image_path = "C:/Users/hp/Documents/Study/AI/ถังขยะสีน้ำเงิน-Photoroom.png" 
-                bg_class = "general-bg"
-                description_text = "🚮 **ขยะทั่วไป => ถังขยะสีน้ำเงิน:** คือขยะอื่นๆ ที่ไม่สามารถจัดอยู่ในประเภทข้างต้นได้ หรือเป็นขยะที่ย่อยสลายยากและไม่คุ้มค่ากับการรีไซเคิล เช่น ถุงพลาสติก ซองขนม โฟม ผ้าอ้อม"
+with col_display:
+    st.subheader(f"📋 รายการทั้งหมด ({len(st.session_state.schedules)} รายการ)")
+    
+    if not st.session_state.schedules:
+        st.info("ยังไม่มีข้อมูลตารางงาน แอดรายการแรกของคุณที่ฟอร์มซ้ายมือได้เลย!")
+    else:
+        # เรียงลำดับวันที่ล่าสุดขึ้นก่อน
+        sorted_schedules = sorted(st.session_state.schedules, key=lambda x: x['date'], reverse=True)
+        
+        # วนลูปแสดงผลรายการงาน
+        for idx, item in enumerate(sorted_schedules):
+            # เลือกคลาสสีตามประเภทงาน
+            bg_class = "bg-tv"
+            if "YouTube" in item['type']: bg_class = "bg-youtube"
+            elif "Concert" in item['type']: bg_class = "bg-concert"
+            elif "Podcast" in item['type']: bg_class = "bg-podcast"
             
-            col1, col2 = st.columns([1, 3])  # แบ่งคอลัมน์แสดงภาพและข้อความผลลัพธ์
-            with col1:
-                if image_path:
-                    try:
-                        st.image(image_path, width=100)  # แสดงรูปภาพถังขยะที่เหมาะสม
-                    except FileNotFoundError:
-                        st.warning("รูปภาพถังขยะไม่พบ โปรดตรวจสอบพาธ")  # แจ้งเตือนถ้ารูปภาพไม่พบ
-            with col2:
-                # แสดงผลการจำแนกด้วยกล่องสีที่เหมาะสม
-                st.markdown(f'<div class="result-box {bg_class}">ผลการจำแนก: **{predicted_label}**</div>', unsafe_allow_html=True)
+            # สร้างกล่องแสดงตารางงานแบบ HTML Card
+            card_html = f"""
+            <div class="schedule-card">
+                <div class="badge {bg_class}">{item['type']}</div>
+                <span style="color: #94a3b8; font-size: 0.8em; float: right;">📅 {item['date']}</span>
+                <h4 style="margin: 5px 0 10px 0; font-weight: bold; color: #1e293b;">{item['title']}</h4>
+            """
             
-            st.info(description_text)  # แสดงคำอธิบายเพิ่มเติมเกี่ยวกับประเภทขยะ
+            if item['note']:
+                card_html += f'<p style="font-size: 0.85em; color: #64748b; background-color: #f8fafc; padding: 8px; border-radius: 6px; font-style: italic; margin-bottom: 8px;">💬 {item["note"]}</p>'
+            
+            if item['link']:
+                card_html += f'<a href="{item["link"]}" target="_blank" style="font-size: 0.85em; color: #8B5CF6; text-decoration: none; font-weight: bold;">🔗 ลิงก์รับชม/รายละเอียด</a>'
+                
+            card_html += "</div>"
+            st.markdown(card_html, unsafe_allow_html=True)
 
-# รูปภาพให้ความรู้
-st.markdown("---")  # เส้นแบ่ง
-st.subheader("💡 การแยกขยะอย่างถูกวิธี เพื่อโลกที่ยั่งยืน 💡")  # หัวข้อย่อย
-st.write("การแยกขยะตั้งแต่ต้นทางเป็นสิ่งสำคัญมากในการลดปริมาณขยะและช่วยให้กระบวนการรีไซเคิลมีประสิทธิภาพยิ่งขึ้น")  # ข้อความ
-try:
-    st.image("C:/Users/hp/Documents/Study/AI/b750b977276c911f043c478792890a36.jpg", use_container_width=True)  
-    # แสดงรูปภาพให้ความรู้ กำหนดให้ขยายเต็มความกว้าง container
-except FileNotFoundError:
-    st.warning("ไม่พบรูปภาพ โปรดตรวจสอบว่าไฟล์อยู่ในโฟลเดอร์ที่ถูกต้องและตั้งชื่อถูกต้อง")  # แจ้งเตือนถ้ารูปภาพไม่พบ
+# เพิ่มปุ่มสำหรับล้างข้อมูลทั้งหมดที่ด้านล่างสุดของ Sidebar (เผื่อเคลียร์คิว)
+if st.sidebar.button("🗑️ ล้างข้อมูลทั้งหมด"):
+    if st.sidebar.checkbox("ยืนยันว่าจะลบข้อมูลทั้งหมดจริงๆ"):
+        st.session_state.schedules = []
+        if os.path.exists(DATA_FILE):
+            os.remove(DATA_FILE)
+        st.sidebar.success("ลบข้อมูลทั้งหมดแล้ว!")
+        st.rerun()
