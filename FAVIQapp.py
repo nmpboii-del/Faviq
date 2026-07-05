@@ -191,9 +191,12 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
         st.markdown(f"**🔥 ความสำเร็จของโปรเจกต์: {progress_percent:.2f}%**")
         st.progress(progress_ratio)
         if mv_data.get('last_updated', 0) > 0:
-            update_str = datetime.datetime.fromtimestamp(mv_data['last_updated']).strftime('%H:%M:%S')
-            st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 ดึงยอดวิวล่าสุดเมื่อเวลา: {update_str} น.</span>", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    import datetime
+
+    thailand_time = mv_data['last_updated'] + 25200 
+    update_str = datetime.datetime.fromtimestamp(thailand_time).strftime('%H:%M:%S')
+    
+    st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 ดึงยอดวิวล่าสุดเมื่อเวลา: {update_str} น. (ระบบจะเช็กข้อมูลใหม่ทุกชั่วโมง)</span>", unsafe_allow_html=True)
     
     # แบ่งฝั่งล่าง: ฝั่งซ้ายโชว์คลังคลิปและของแจก / ฝั่งขวาเปิดกล่องรับความรู้สึกจากแฟนๆ
     col_left_content, col_right_fanbox = st.columns([2.2, 1])
