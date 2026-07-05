@@ -270,7 +270,6 @@ if view_mode == "🏠 หน้าแรก":
     st.markdown('</div>', unsafe_allow_html=True)
     
     # --- ดึงรายชื่อแท็บแบบ Dynamic ตามที่ตั้งค่าจากหลังบ้าน ---
-    # --- ดึงรายชื่อแท็บแบบ Dynamic ตามที่ตั้งค่าจากหลังบ้าน ---
     defined_tabs = sys_config.get("tabs", [])
     
     # กรองข้อมูลเฉพาะที่เป็น dictionary และมี key 'title' เพื่อป้องกันบั๊ก TypeError
@@ -280,7 +279,6 @@ if view_mode == "🏠 หน้าแรก":
             if isinstance(t, dict) and "title" in t:
                 valid_tabs.append(t)
             elif isinstance(t, str):
-                # ป้องกันกรณีระบบเผลอเซฟเป็น string หลุดมา
                 valid_tabs.append({"id": f"tab_gen_{time.time()}", "title": str(t), "type": "all_videos", "target": ""})
 
     if not valid_tabs:
@@ -443,22 +441,24 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
             
             updated_tabs = []
             for t_idx, t_item in enumerate(sys_config.get("tabs", [])):
+                if not isinstance(t_item, dict) or "title" not in t_item:
+                    continue
+                    
                 col_t1, col_t2, col_t3, col_t4 = st.columns([1.5, 1.5, 1.5, 0.5])
                 
                 # ปรับแต่งชื่อแสดงผลของแต่ละแท็บ
                 t_title = col_t1.text_input(f"ชื่อป้ายแท็บที่ {t_idx+1}", value=t_item["title"], key=f"tab_title_in_{t_idx}")
                 
-                # แสดงประเภทและเป้าหมายข้อมูล (อ่านได้อย่างเดียวในส่วนนี้เพื่อป้องกันบั๊ก)
-                col_t2.caption(f"ประเภทเนื้อหา: `{t_item['type']}`")
-                if t_item['target']:
+                # แสดงประเภทและเป้าหมายข้อมูล
+                col_t2.caption(f"ประเภทเนื้อหา: `{t_item.get('type', '')}`")
+                if t_item.get('target'):
                     col_t3.caption(f"เป้าหมายดึงข้อมูล: `{t_item['target']}`")
                 else:
                     col_t3.caption("-")
                 
                 # ปุ่มลบแท็บทิ้ง
                 if col_t4.button("🗑️", key=f"del_tab_btn_{t_idx}"):
-                    # ป้องกันการกดลบจนหน้าจอว่างเปล่าไร้เมนู
-                    if len(sys_config["tabs"]) <= 1:
+                    if len(sys_config.get("tabs", [])) <= 1:
                         st.error("ไม่สามารถลบแท็บทั้งหมดได้ ต้องเหลือไว้อย่างน้อย 1 แท็บครับ")
                     else:
                         sys_config["tabs"].pop(t_idx)
@@ -467,10 +467,10 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         st.rerun()
                 
                 updated_tabs.append({
-                    "id": t_item["id"],
+                    "id": t_item.get("id", f"tab_{t_idx}"),
                     "title": t_title,
-                    "type": t_item["type"],
-                    "target": t_item["target"]
+                    "type": t_item.get("type", "all_videos"),
+                    "target": t_item.get("target", "")
                 })
             
             # บันทึกการแก้ไขชื่อชื่อแท็บที่มีอยู่เดิม
@@ -505,12 +505,18 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 
                 if add_tab_submit and new_tab_title.strip():
                     unique_id = f"tab_{int(time.time())}"
-                    target_val = chosen_shelf_target if new_tab_content_type[0] == "single_shelf_only" else ""
                     
+                    # ป้องกันการบันทึก tuple ลงไฟล์ json (จุดแก้วิกฤต)
+                    actual_type = new_tab_content_type[0] if isinstance(new_tab_content_type, tuple) else new_tab_content_type
+                    target_val = chosen_shelf_target if actual_type == "single_shelf_only" else ""
+                    
+                    if "tabs" not in sys_config or not isinstance(sys_config["tabs"], list):
+                        sys_config["tabs"] = []
+                        
                     sys_config["tabs"].append({
                         "id": unique_id,
                         "title": new_tab_title.strip(),
-                        "type": new_tab_content_type[0],
+                        "type": actual_type,
                         "target": target_val
                     })
                     save_system_config(sys_config)
