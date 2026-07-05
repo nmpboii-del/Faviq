@@ -145,9 +145,7 @@ def fetch_live_youtube_views(video_id):
 def clean_html_tags(text):
     if not text or pd.isna(text): return ""
     cleaned = str(text)
-    cleaned = re.sub(r'</?div[^>]*>', '', cleaned)
-    cleaned = re.sub(r'</?a[^>]*>', '', cleaned)   
-    cleaned = re.sub(r'</?span[^>]*>', '', cleaned) 
+    cleaned = re.sub(r'</?(div|a|span)[^>]*>', '', cleaned, flags=re.IGNORECASE)   
     return cleaned.strip()
 
 def load_mv_highlight():
@@ -342,14 +340,14 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 """, unsafe_allow_html=True)
 
                 elif t_type == "home_dashboard":
-                    # 🛠️ ปรับเปลี่ยน Layout แยกฝั่งซ้าย-ขวา 50/50 
+                    # Layout แยกฝั่งซ้าย-ขวา 50/50 ปรับความเสถียรของแท็ก HTML
                     col_left_side, col_right_side = st.columns([1, 1])
                     
                     with col_left_side:
                         pinned_vids = [v for v in all_vids if v.get('pinned', False)]
                         st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม</div>', unsafe_allow_html=True)
                         if pinned_vids:
-                            pv_cols = st.columns(2) # แยกย่อยข้างในเป็น 2 คอลัมน์ย่อยเพื่อให้จัดวางสมดุล
+                            pv_cols = st.columns(2)
                             for pv_idx, pv_item in enumerate(pinned_vids[:4]):
                                 with pv_cols[pv_idx % 2]:
                                     thumb = get_youtube_thumbnail(pv_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
@@ -765,7 +763,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         save_data(st.session_state.schedules)
                         st.rerun()
 
-        with st.expander("📬 5. เปิดกล่องอ่านจดหมายลับจากแฟนคลับ (Fan Letters)"):
+        with st.expander("¼ 5. เปิดกล่องอ่านจดหมายลับจากแฟนคลับ (Fan Letters)"):
             messages_list = load_messages()
             if not messages_list: st.info("กล่องจดหมายว่างอยู่")
             else:
@@ -776,9 +774,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if os.path.exists(MESSAGES_FILE): os.remove(MESSAGES_FILE)
                     st.success("ล้างตู้จดหมายเรียบร้อย!"); st.rerun()
                     
-        # =========================================================================
-        # 📅 6. ระบบหลังบ้านสำหรับจัดการตารางงานศิลปินตัวจริง (ใหม่ล่าสุด)
-        # =========================================================================
+        # --- 📅 6. ระบบหลังบ้านสำหรับจัดการตารางงานศิลปินตัวจริง (แก้ไขจุดบั๊กตัวแปร) ---
         with st.expander("📅 6. จัดการตารางงานศิลปิน (เพิ่มคิวงาน/ตารางออกอากาศ)"):
             live_sched_data = load_live_schedules()
             col_ls_form, col_ls_manage = st.columns([1, 1.2])
@@ -798,11 +794,11 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     ls_default_date = datetime.date.today()
                     ls_btn_txt = "➕ เพิ่มคิวงานเข้าตาราง"
                     
-                with st.form(key="live_schedule_form"):
+                with st.form(key="live_schedule_form_v2"):
                     ls_title = st.text_input("รายการ / ชื่องานคอนเสิร์ต (เช่น รายการ T-POP STAGE):", value=ls_default_title)
                     ls_date = st.date_input("วันที่จัดงาน / ออกอากาศ:", value=ls_default_date)
                     ls_time = st.text_input("เวลา (เช่น 21:45 น. หรือ 15.30):", value=ls_default_time)
-                    ls_loc = st.text_input("สถานที่ / ช่องทางการรับชม (เช่น WORKPOINT 23 / Central World):", value=ls_loc_input if 'ls_loc' in locals() else ls_default_loc)
+                    ls_loc = st.text_input("สถานที่ / ช่องทางการรับชม (เช่น WORKPOINT 23 / Central World):", value=ls_default_loc)
                     ls_note = st.text_input("หมายเหตุเล็กๆ (เช่น งานเปิด/ไม่รวมพล, เฉพาะผู้มีสิทธิ์):", value=ls_default_note)
                     ls_submit = st.form_submit_button(ls_btn_txt)
                     
