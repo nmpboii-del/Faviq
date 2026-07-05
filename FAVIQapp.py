@@ -227,22 +227,15 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# 🛠️ ย้ายโหมดจาก Sidebar มาไว้ด้านบนสุดเพื่อให้เลือกง่าย ไม่หลงทาง
-col_header_title, col_header_mode = st.columns([2.5, 1])
-with col_header_title:
-    st.markdown("<h1 style='color: #f8fafc; margin: 0;'>🎬 Faviq Space</h1>", unsafe_allow_html=True)
-with col_header_mode:
-    view_mode = st.segmented_control(
-        "เลือกโหมดการใช้งาน",
-        ["🏠 หน้าแรกแกลเลอรี", "⚙️ ระบบหลังบ้าน"],
-        default="🏠 หน้าแรกแกลเลอรี"
-    )
-st.markdown("---")
+# ↩️ ย้ายเมนูเลือกโหมดกลับไปที่ Sidebar ซ้ายมือเหมือนเดิมตามต้องการ
+view_mode = st.sidebar.radio("MENU", ["🏠 หน้าแรกแกลเลอรี", "⚙️ ระบบหลังบ้าน"])
 
 # ==========================================
 # 🏠 หน้าแรกแกลเลอรี
 # ==========================================
 if view_mode == "🏠 หน้าแรกแกลเลอรี":
+    st.markdown("<h2 style='color: #f8fafc; margin-bottom: 5px;'>🎬 Artist Hub & Fan Space</h2>", unsafe_allow_html=True)
+    
     gifts_list = load_gifts()
     all_vids = load_data()
     df_vids = pd.DataFrame(all_vids).sort_values(by='date', ascending=False) if all_vids else pd.DataFrame()
@@ -275,9 +268,8 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
             st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 เวลาที่อัปเดตล่าสุด(อัปเดตทุก 10 นาที): {update_str} น.</span>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # ดึงรายชื่อแท็บแบบ Dynamic หลังบ้าน
+    # ดึงรายชื่อแท็บแบบ Dynamic
     defined_tabs = sys_config.get("tabs", [])
-    
     valid_tabs = []
     if isinstance(defined_tabs, list):
         for t in defined_tabs:
@@ -291,15 +283,15 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
         
         for index, tab_info in enumerate(valid_tabs):
             with tab_objects[index]:
-                t_type = tab_info.get("type", "all_videos")
+                # ตรวจเช็กทั้งฟิลด์ 'type' และตรวจสอบคำว่า 'digital_goods' เพื่อความแม่นยำสูง
+                t_type = str(tab_info.get("type", "")).strip()
                 t_target = tab_info.get("target", "")
                 
                 if t_type == "home_dashboard":
-                    # 📌 1. โซนของแจก Digital Goods ล่าสุด (ให้ขึ้นโชว์อันแรกสุดของหน้าโฮมตามต้องการ)
+                    # ✨ โชว์ Digital Goods ล่าสุด 4 อัน บนหน้าแรกสุด
                     if gifts_list:
                         st.markdown('<div class="yt-shelf-title">🎨 ล่าสุดจาก Digital Goods โหลดฟรี!</div>', unsafe_allow_html=True)
                         g_home_cols = st.columns(4)
-                        # ดึง 4 ชิ้นล่าสุดมาโชว์ที่หน้าแรก
                         for g_idx, g_item in enumerate(gifts_list[:4]):
                             with g_home_cols[g_idx % 4]:
                                 img_src = g_item['img_url']
@@ -312,7 +304,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </div>
                                 """, unsafe_allow_html=True)
                                 
-                    # 📌 2. โซนวิดีโอแนะนำปักหมุด
+                    # โซนวิดีโอแนะนำปักหมุด
                     pinned_vids = [v for v in all_vids if v.get('pinned', False)]
                     if pinned_vids:
                         st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม</div>', unsafe_allow_html=True)
@@ -336,7 +328,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </a>
                                 """, unsafe_allow_html=True)
                     
-                    # 📌 3. โชว์วิดีโอทั่วไปรายหมวดหมู่
+                    # โชว์วิดีโอทั่วไปรายหมวดหมู่
                     homepage_shelves = sys_config.get("video_shelves", [])[:2]
                     for shelf in homepage_shelves:
                         df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
@@ -413,8 +405,11 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </a>
                                 """, unsafe_allow_html=True)
 
-                elif t_type == "digital_goods":
-                    if not gifts_list: st.caption("ขณะนี้ยังไม่มีรูปภาพเปิดให้ดาวน์โหลด")
+                # 🛠️ จุดแก้ไขสำคัญ: ปลดล็อกเงื่อนไขตรวจสอบประเภทให้ดึงภาพของแจกทั้งหมดมาโชว์ในแท็บ Digital Goods แบบแยกต่างหากได้ 100%
+                elif t_type == "digital_goods" or "gift" in t_type or "goods" in t_type:
+                    st.markdown('<div class="yt-shelf-title">🎨 คลังดาวน์โหลดรูปภาพ Digital Goods ทั้งหมด</div>', unsafe_allow_html=True)
+                    if not gifts_list: 
+                        st.info("ขณะนี้ยังไม่มีรูปภาพเปิดให้ดาวน์โหลด สามารถเพิ่มรูปภาพได้จากระบบหลังบ้านครับ")
                     else:
                         g_cols = st.columns(4)
                         for g_idx, g_item in enumerate(gifts_list):
