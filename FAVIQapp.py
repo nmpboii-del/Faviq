@@ -61,7 +61,7 @@ def save_system_config(config_data):
 
 sys_config = load_system_config()
 
-# --- ฟังก์ชันระบบช่วยดึงข้อมูล (ปรับปรุงใหม่ รองรับขีดกลาง - แบบในรูปภาพ image_28a921.png) ---
+# --- ฟังก์ชันระบบช่วยดึงข้อมูล ---
 def extract_youtube_id(url):
     if not url or pd.isna(url): return None
     regex_list = [
@@ -85,7 +85,6 @@ def fetch_youtube_details(url):
     channel = "Official Channel"
     if not video_id: return title, channel, default_date
     
-    # วิธีที่ 1: ดึงผ่าน oEmbed (ปลอดภัยและเร็วที่สุด)
     try:
         embed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
         res = requests.get(embed_url, timeout=5)
@@ -96,7 +95,6 @@ def fetch_youtube_details(url):
             return title, channel, default_date
     except: pass
     
-    # วิธีที่ 2: ดึงตรงจากหน้าเว็บ (Fallback สำรอง)
     try:
         watch_url = f"https://www.youtube.com/watch?v={video_id}"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "th-TH,th;q=0.9"}
@@ -356,13 +354,20 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </a>
                                 """, unsafe_allow_html=True)
                     
-                    homepage_shelves = sys_config.get("video_shelves", [])[:2]
+                    homepage_shelves = sys_config.get("video_shelves", [])
                     for shelf in homepage_shelves:
                         df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
                         if not df_shelf.empty:
                             st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
+                            shelf_records = df_shelf.to_dict('records')
+                            
+                            s_key = f"sh_home_{shelf['type'].replace(' ', '_').replace('/', '_')}"
+                            if s_key not in st.session_state: st.session_state[s_key] = False
+                            
+                            display_vids = shelf_records if st.session_state[s_key] else shelf_records[:4]
+                            
                             v_cols = st.columns(4)
-                            for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
+                            for v_idx, v_item in enumerate(display_vids):
                                 with v_cols[v_idx % 4]:
                                     thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
                                     st.markdown(f"""
@@ -371,20 +376,29 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                             <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
                                             <div class="yt-video-details">
                                                 <div class="yt-video-title">{v_item["title"]}</div>
+                                                <div class="yt-video-channel">👤 {v_item.get('channel', 'Official Channel')}</div>
                                                 <div class="yt-video-meta">📅 {v_item["date"]}</div>
                                             </div>
                                         </div>
                                     </a>
                                     """, unsafe_allow_html=True)
+                            
+                            if len(shelf_records) > 4:
+                                if st.button("🔽 ดูเพิ่มเติม" if not st.session_state[s_key] else "🔼 ยุบแถว", key=f"btn_home_{s_key}"):
+                                    st.session_state[s_key] = not st.session_state[s_key]
+                                    st.rerun()
 
+                # 🛠️ แก้ไขเรียบร้อย: เพิ่มเงื่อนไขตรวจสอบว่าถ้าหมวดหมู่ไหนไม่มีคลิป (df_shelf.empty) จะข้ามไปทันที ไม่แสดงแถวว่าง
                 elif t_type == "all_videos":
                     video_shelves = sys_config.get("video_shelves", [])
+                    has_any_video = False
+                    
                     for shelf in video_shelves:
-                        st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
                         df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
-                        if df_shelf.empty:
-                            st.caption("ยังไม่มีวิดีโอในหมวดหมู่นี้")
-                        else:
+                        
+                        if not df_shelf.empty:
+                            has_any_video = True
+                            st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
                             shelf_records = df_shelf.to_dict('records')
                             s_key = f"sh_all_{shelf['type'].replace(' ', '_').replace('/', '_')}"
                             if s_key not in st.session_state: st.session_state[s_key] = False
@@ -400,6 +414,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                             <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
                                             <div class="yt-video-details">
                                                 <div class="yt-video-title">{v_item["title"]}</div>
+                                                <div class="yt-video-channel">👤 {v_item.get('channel', 'Official Channel')}</div>
                                                 <div class="yt-video-meta">📅 {v_item["date"]}</div>
                                             </div>
                                         </div>
@@ -409,6 +424,9 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 if st.button("🔽 ดูเพิ่มเติม" if not st.session_state[s_key] else "🔼 ยุบแถว", key=f"btn_{s_key}"):
                                     st.session_state[s_key] = not st.session_state[s_key]
                                     st.rerun()
+                                    
+                    if not has_any_video:
+                        st.info("ขณะนี้ยังไม่มีข้อมูลวิดีโอในระบบ")
 
                 elif t_type == "single_shelf_only":
                     st.markdown(f'<div class="yt-shelf-title">📂 หมวดหมู่: {t_target}</div>', unsafe_allow_html=True)
@@ -426,6 +444,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                         <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
                                         <div class="yt-video-details">
                                             <div class="yt-video-title">{v_item["title"]}</div>
+                                            <div class="yt-video-channel">👤 {v_item.get('channel', 'Official Channel')}</div>
                                             <div class="yt-video-meta">📅 {v_item["date"]}</div>
                                         </div>
                                     </div>
