@@ -32,6 +32,10 @@ EVENT_SCHEDULE_FILE = "artist_event_schedule.csv"
 
 ADMIN_PASSWORD = "Nittaya_195"
 
+# 🖼️ ใส่ URL ของรูปภาพขนาด 1500*1500 ที่ต้องการใช้เป็นรูปส่วนหัวเพจตรงนี้
+# (สามารถเปลี่ยนเป็น Path ของไฟล์ในเครื่องได้ เช่น "images/header.png")
+HEADER_IMAGE_URL = "images/headpage.jpg" 
+
 # --- ฟังก์ชันจัดการโครงสร้างหัวข้อ/หมวดหมู่ระบบ ---
 def load_system_config():
     default_config = {
@@ -294,6 +298,9 @@ st.markdown(
     
     .stTabs [data-baseweb="tab-list"] { gap: 24px; border-bottom: 1px solid #2d3748; }
     .stTabs [data-baseweb="tab"] { font-size: 16px; font-weight: 600; padding-bottom: 8px; background-color: transparent !important; }
+    
+    /* ควบคุมขนาดและเอฟเฟกต์ของรูปภาพ Header */
+    .header-banner-container { width: 100%; display: flex; justify-content: center; margin-bottom: 20px; border-radius: 16px; overflow: hidden; }
     </style>
     """,
     unsafe_allow_html=True
@@ -305,7 +312,10 @@ view_mode = st.sidebar.radio("MENU", ["🏠 หน้าแรกแกลเล
 # 🏠 หน้าแรกแกลเลอรี
 # ==========================================
 if view_mode == "🏠 หน้าแรกแกลเลอรี":
-    st.markdown("<h2 style='color: #f8fafc; margin-bottom: 5px;'>🎬 Artist Hub & Fan Space</h2>", unsafe_allow_html=True)
+    # 🖼️ แสดงรูปภาพส่วนหัวเพจ (Header) ด้านบนสุดของหน้าแกลเลอรี
+    st.image(HEADER_IMAGE_URL, use_container_width=True)
+    
+    st.markdown("<h2 style='color: #f8fafc; margin-top: 15px; margin-bottom: 5px;'>🎬 Artist Hub & Fan Space</h2>", unsafe_allow_html=True)
     
     gifts_list = load_gifts()
     all_vids = load_data()
@@ -584,7 +594,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 except:
                                     pass
                                 
-                                # ปรับแต่งโครงสร้าง: หากเป็นงานที่ผ่านมาแล้ว จะเปลี่ยนเป็นแค่การใช้คลาสสีเทาหม่น (.past-event) โดยไม่มีคำสร้อยและไม่มีสไตล์ขีดฆ่าตัวหนังสือ
                                 box_class = "schedule-item-box past-event" if is_past else "schedule-item-box"
                                 badge_style = "background-color: #64748b; color:#fff; box-shadow: none;" if is_past else "background-color: #3b82f6; color:#fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);"
                                 title_style = "color: #94a3b8; font-size: 19px;" if is_past else "color: #60a5fa; font-size: 19px;"
