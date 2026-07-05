@@ -61,12 +61,18 @@ def save_system_config(config_data):
 
 sys_config = load_system_config()
 
-# --- ฟังก์ชันระบบช่วยดึงข้อมูล ---
+# --- ฟังก์ชันระบบช่วยดึงข้อมูล (ปรับปรุงใหม่ รองรับขีดกลาง - แบบในรูปภาพ image_28a921.png) ---
 def extract_youtube_id(url):
     if not url or pd.isna(url): return None
-    youtube_regex = r'(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/shorts/)([^&=%\?\{\s]+)'
-    match = re.search(youtube_regex, str(url))
-    return match.group(4) if match else None
+    regex_list = [
+        r"(?:v=|\/v\/|embed\/|shorts\/|youtu\.be\/|\/embed\/)([a-zA-Z0-9_-]{11})",
+        r"(?:watch\?v=)([a-zA-Z0-9_-]{11})"
+    ]
+    for regex in regex_list:
+        match = re.search(regex, str(url))
+        if match:
+            return match.group(1)
+    return None
 
 def get_youtube_thumbnail(url):
     video_id = extract_youtube_id(url)
@@ -78,6 +84,8 @@ def fetch_youtube_details(url):
     title = "วิดีโอ YouTube"
     channel = "Official Channel"
     if not video_id: return title, channel, default_date
+    
+    # วิธีที่ 1: ดึงผ่าน oEmbed (ปลอดภัยและเร็วที่สุด)
     try:
         embed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
         res = requests.get(embed_url, timeout=5)
@@ -85,22 +93,27 @@ def fetch_youtube_details(url):
             data = res.json()
             title = data.get("title", "วิดีโอ YouTube")
             channel = data.get("author_name", "Official Channel")
+            return title, channel, default_date
     except: pass
+    
+    # วิธีที่ 2: ดึงตรงจากหน้าเว็บ (Fallback สำรอง)
     try:
         watch_url = f"https://www.youtube.com/watch?v={video_id}"
-        headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "th-TH,th;q=0.9"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "th-TH,th;q=0.9"}
         res = requests.get(watch_url, headers=headers, timeout=5)
         if res.status_code == 200:
             title_match = re.search(r'<title>(.*?)</title>', res.text)
             if title_match: title = title_match.group(1).replace(" - YouTube", "").strip()
+            
             channel_match = re.search(r'"ownerChannelName":"([^"]+)"', res.text) or re.search(r'"author":"([^"]+)"', res.text)
             if channel_match: channel = channel_match.group(1).strip()
+            
             date_match = re.search(r'"publishDate":"([^"]+)"', res.text) or re.search(r'"uploadDate":"([^"]+)"', res.text) or re.search(r'<meta itemprop="datePublished" content="([^"]+)"', res.text)
             if date_match:
                 parsed_date = date_match.group(1)[:10]
                 default_date = datetime.datetime.strptime(parsed_date, "%Y-%m-%d").date()
-            return title, channel, default_date
     except: pass
+    
     return title, channel, default_date
 
 def fetch_live_youtube_views(video_id):
@@ -582,7 +595,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
         # =========================================================================
-        # 🎬 4. ส่วนจัดระเบียบวิดีโอใหม่ (แก้ไขระเบียบตัวแปรและ Widget Key ทั้งหมด)
+        # 🎬 4. ส่วนจัดระเบียบวิดีโอ (อัปเดตรองรับ ID มีขีดกลาง และป้องกันปัญหากล่องว่าง)
         # =========================================================================
         with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
             st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
@@ -626,14 +639,15 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     d_note, d_pinned, d_type_idx = "", False, 0
                     btn_txt = "🚀 อัปโหลดเข้าคลัง"
                 
-                with st.form(key='admin_vid_form_v12'):
-                    title = st.text_input("ชื่อคลิป:", value=d_title, key="form_vid_title_v2")
-                    channel = st.text_input("ชื่อช่องต้นทาง:", value=d_channel, key="form_vid_channel_v2")
-                    date_val = st.date_input("วันที่ออนแอร์:", value=d_date, key="form_vid_date_v2")
-                    w_type = st.selectbox("ประเภท:", available_options, index=d_type_idx, key="form_vid_type_v2")
-                    link = st.text_input("ลิงก์คลิป:", value=d_link, key="form_vid_link_v2")
-                    note = st.text_area("โน้ตย่อ:", value=d_note, key="form_vid_note_v2")
-                    is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=d_pinned, key="form_vid_pinned_v2")
+                # 🛠️ โครงสร้าง Form v13 ปล่อยค่า Value วิ่งตาม Session แบบไม่มีคีย์ย้อนกลับ มั่นใจได้ว่าค่าไม่ค้างและไม่พัง[cite: 1]
+                with st.form(key='admin_vid_form_v13'):
+                    title = st.text_input("ชื่อคลิป:", value=d_title)
+                    channel = st.text_input("ชื่อช่องต้นทาง:", value=d_channel)
+                    date_val = st.date_input("วันที่ออนแอร์:", value=d_date)
+                    w_type = st.selectbox("ประเภท:", available_options, index=d_type_idx)
+                    link = st.text_input("ลิงก์คลิป:", value=d_link)
+                    note = st.text_area("โน้ตย่อ:", value=d_note)
+                    is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=d_pinned)
                     vid_submit = st.form_submit_button(btn_txt)
                 
                 if vid_submit and title.strip():
@@ -652,7 +666,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     else: 
                         st.session_state.schedules.append(item_data)
                     
-                    for k in ["fetched_title_val_v2", "fetched_channel_val_v2", "fetched_date_val_v2", "fetched_link_val_v2", "form_vid_title_v2", "form_vid_channel_v2", "form_vid_link_v2", "form_vid_note_v2"]:
+                    for k in ["fetched_title_val_v2", "fetched_channel_val_v2", "fetched_date_val_v2", "fetched_link_val_v2"]:
                         if k in st.session_state: del st.session_state[k]
                         
                     save_data(st.session_state.schedules)
