@@ -14,12 +14,12 @@ except:
     fav_icon = "🎬"
 
 st.set_page_config(
-    page_title="Artist Video Gallery & Fan Hub",
+    page_title="Artist Hub & Video Gallery",
     page_icon=fav_icon,
     layout="wide"
 )
 
-# รายชื่อไฟล์สำหรับเก็บข้อมูล
+# รายชื่อไฟล์ข้อมูล
 DATA_FILE = "artist_schedules.csv"
 INFO_FILE = "important_info.txt"
 MV_FILE = "mv_highlight.csv"
@@ -28,7 +28,7 @@ MESSAGES_FILE = "fan_messages.csv"
 
 ADMIN_PASSWORD = "Nittaya_195"
 
-# --- ฟังก์ชันจัดการระบบวิดีโอและวิวอัตโนมัติ ---
+# --- ฟังก์ชันระบบดึงค่าอัตโนมัติ ---
 def extract_youtube_id(url):
     if not url or pd.isna(url): return None
     youtube_regex = r'(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/shorts/)([^&=%\?\{\s]+)'
@@ -43,11 +43,11 @@ def fetch_live_youtube_views(video_id):
     if not video_id: return None
     try:
         url = f"https://www.youtube.com/watch?v={video_id}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept-Language": "en-US,en;q=0.9"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
             match = re.search(r'"viewCount":"(\d+)"', response.text)
-            if match: return int(match.group(1))
+            return int(match.group(1)) if match else None
     except: pass
     return None
 
@@ -58,12 +58,11 @@ def load_mv_highlight():
             df = pd.read_csv(MV_FILE)
             data = df.to_dict('records')[0]
             current_time = time.time()
-            last_update_time = float(data.get('last_updated', 0.0))
-            video_id = extract_youtube_id(data['url'])
-            if (current_time - last_update_time) >= 3600 and video_id:
-                fresh_views = fetch_live_youtube_views(video_id)
-                if fresh_views and fresh_views > 0:
-                    data['current_views'] = fresh_views
+            if (current_time - float(data.get('last_updated', 0.0))) >= 3600:
+                v_id = extract_youtube_id(data['url'])
+                fresh = fetch_live_youtube_views(v_id) if v_id else None
+                if fresh:
+                    data['current_views'] = fresh
                     data['last_updated'] = current_time
                     pd.DataFrame([data]).to_csv(MV_FILE, index=False, encoding='utf-8-sig')
             return data
@@ -71,18 +70,14 @@ def load_mv_highlight():
     return default_data
 
 def save_mv_highlight(url, current_views, target_views, title):
-    df = pd.DataFrame([{"url": url, "current_views": int(current_views), "target_views": int(target_views), "title": title, "last_updated": time.time()}])
-    df.to_csv(MV_FILE, index=False, encoding='utf-8-sig')
+    pd.DataFrame([{"url": url, "current_views": int(current_views), "target_views": int(target_views), "title": title, "last_updated": time.time()}]).to_csv(MV_FILE, index=False, encoding='utf-8-sig')
 
 def load_gifts():
-    if os.path.exists(GIFTS_FILE): return pd.read_csv(GIFTS_FILE).to_dict('records')
-    return []
+    return pd.read_csv(GIFTS_FILE).to_dict('records') if os.path.exists(GIFTS_FILE) else []
 
 def save_gifts(data): pd.DataFrame(data).to_csv(GIFTS_FILE, index=False, encoding='utf-8-sig')
 
-def load_messages():
-    if os.path.exists(MESSAGES_FILE): return pd.read_csv(MESSAGES_FILE).to_dict('records')
-    return []
+def load_messages(): return pd.read_csv(MESSAGES_FILE).to_dict('records') if os.path.exists(MESSAGES_FILE) else []
 
 def save_message(name, message):
     new_msg = {"timestamp": datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), "name": name, "message": message}
@@ -95,7 +90,6 @@ def load_data():
         df = pd.read_csv(DATA_FILE)
         df['date'] = df['date'].astype(str)
         if 'pinned' not in df.columns: df['pinned'] = False
-        else: df['pinned'] = df['pinned'].astype(bool)
         return df.to_dict('records')
     return []
 
@@ -111,25 +105,31 @@ def save_important_info(text):
 
 if "schedules" not in st.session_state: st.session_state.schedules = load_data()
 
-# --- ตกแต่ง CSS ---
+# --- ตกแต่ง CSS หน้าตา YouTube ---
 st.markdown(
     """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .billboard-box { background: linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%); border-left: 6px solid #c084fc; padding: 20px; border-radius: 14px; color: #f1f5f9; margin-bottom: 25px; }
-    .mv-dashboard-box { background-color: #0b0f19; border: 2px solid #38bdf8; border-radius: 18px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 20px rgba(56, 189, 248, 0.15); }
-    .video-card { background-color: #0f172a; padding: 12px; border-radius: 14px; border: 1px solid #1e293b; margin-bottom: 25px; transition: transform 0.2s; }
-    .video-card:hover { transform: translateY(-4px); border-color: #38bdf8; }
+    .mv-dashboard-box { background-color: #0b0f19; border: 2px solid #38bdf8; border-radius: 18px; padding: 20px; margin-bottom: 30px; }
+    
+    /* สไตล์การ์ดวิดีโอ */
+    .video-card { background-color: #0f172a; padding: 12px; border-radius: 14px; border: 1px solid #1e293b; margin-bottom: 15px; }
     .thumbnail-container { position: relative; width: 100%; padding-top: 56.25%; overflow: hidden; border-radius: 10px; }
     .thumbnail-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
-    .gift-card { background-color: #0f172a; border: 1px solid #334155; border-radius: 14px; padding: 10px; text-align: center; margin-bottom: 20px; }
-    .gift-img { width: 100%; border-radius: 10px; height: 180px; object-fit: cover; margin-bottom: 10px; }
-    .letter-card { background-color: #1e293b; border-left: 4px solid #10b981; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-    .video-title { font-size: 15px; font-weight: 600; margin: 12px 0 6px 0; color: #f8fafc; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .video-title { font-size: 14px; font-weight: 600; margin: 10px 0 4px 0; color: #f8fafc; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .video-meta { font-size: 12px; color: #94a3b8; }
-    .watch-btn { display: inline-block; background-color: #ef4444; color: white !important; padding: 6px 16px; font-size: 12px; font-weight: bold; border-radius: 20px; text-decoration: none !important; margin-top: 10px; text-align: center;}
-    .download-btn { display: block; background-color: #10b981; color: white !important; padding: 8px 12px; font-size: 13px; font-weight: bold; border-radius: 10px; text-decoration: none !important; text-align: center; margin-top: 5px; }
+    
+    /* สไตล์ของแจกแนวตั้งวางเรียงแนวนอน */
+    .gift-card { background-color: #0f172a; border: 1px solid #334155; border-radius: 14px; padding: 10px; text-align: center; margin-bottom: 15px; }
+    .gift-img { width: 100%; border-radius: 10px; height: 150px; object-fit: cover; margin-bottom: 8px; }
+    
+    .watch-btn { display: inline-block; background-color: #ef4444; color: white !important; padding: 4px 12px; font-size: 12px; font-weight: bold; border-radius: 20px; text-decoration: none !important; margin-top: 6px; }
+    .download-btn { display: block; background-color: #10b981; color: white !important; padding: 6px 10px; font-size: 12px; font-weight: bold; border-radius: 10px; text-decoration: none !important; text-align: center; margin-top: 5px; }
+    
+    /* ตกแต่งเส้นหัวข้อชั้นวางให้เหมือน YouTube */
+    .shelf-title { font-size: 18px; font-weight: bold; color: #38bdf8; margin: 20px 0 10px 0; display: flex; align-items: center; gap: 8px; }
     </style>
     """,
     unsafe_allow_html=True
@@ -138,258 +138,245 @@ st.markdown(
 view_mode = st.sidebar.radio("เมนูนำทาง", ["🏠 หน้าแรกแกลเลอรี", "⚙️ ระบบหลังบ้าน (สำหรับแนท)"])
 
 # ==========================================
-# 🏠 หน้าแรกแกลเลอรีวิดีโอและศูนย์แฟนคลับ
+# 🏠 หน้าแรกแกลเลอรี: จัดรูปแบบชั้นวางแนวนอน YouTube
 # ==========================================
 if view_mode == "🏠 หน้าแรกแกลเลอรี":
-    st.markdown("<h1 style='text-align: center; color: #38bdf8;'>⭐ Artist Hub & Fan Space</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #38bdf8;'>⭐ Artist Hub & Home</h1>", unsafe_allow_html=True)
     st.markdown("<hr style='border-color: #1e293b;'>", unsafe_allow_html=True)
     
+    # 1. บอร์ดประกาศข่าวสำคัญ
     important_text = load_important_info()
-    st.markdown(f"""
-    <div class="billboard-box">
-        <h3 style="margin-top:0; color:#c084fc; font-size:17px;">📢 ประกาศและข้อมูลสำคัญจากแอดมิน</h3>
-        <p style="margin-bottom:0; font-size:15px; white-space: pre-wrap;">{important_text}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<div class="billboard-box"><h3 style="margin-top:0; color:#c084fc; font-size:16px;">📢 ประกาศและข้อมูลสำคัญจากแอดมิน</h3><p style="margin-bottom:0; font-size:14px; white-space: pre-wrap;">{important_text}</p></div>', unsafe_allow_html=True)
     
+    # 2. แดชบอร์ดโฟกัส MV หลัก
     mv_data = load_mv_highlight()
     st.markdown(f"### 🎵 PROJECT FOCUS: {mv_data['title']}")
     st.markdown('<div class="mv-dashboard-box">', unsafe_allow_html=True)
     col_mv_player, col_mv_milestone = st.columns([1.3, 1])
-    
     with col_mv_player:
         yt_id = extract_youtube_id(mv_data['url'])
         if yt_id: st.video(f"https://www.youtube.com/watch?v={yt_id}")
         else: st.error("ลิงก์เพลงหลักไม่ถูกต้อง")
-            
     with col_mv_milestone:
         st.markdown("<h4 style='color: #38bdf8; margin-top:0;'>📊 สถิติเป้าหมายอัตโนมัติ (อัปเดตทุก 1 ชม.)</h4>", unsafe_allow_html=True)
-        c_views = int(mv_data['current_views'])
-        t_views = int(mv_data['target_views'])
+        c_views, t_views = int(mv_data['current_views']), int(mv_data['target_views'])
         progress_ratio = min(float(c_views / t_views), 1.0) if t_views > 0 else 0.0
-        progress_percent = progress_ratio * 100
-        
-        col_m1, col_m2 = st.columns(2)
-        with col_m1: st.metric(label="📈 ยอดวิวปัจจุบันบน YouTube", value=f"{c_views:,} วิว")
-        with col_m2: st.metric(label="🎯 เป้าหมายโปรเจกต์", value=f"{t_views:,} วิว")
-            
-        st.markdown(f"**🔥 ความสำเร็จของโปรเจกต์: {progress_percent:.2f}%**")
+        st.columns(2)[0].metric(label="📈 ยอดวิวบน YouTube", value=f"{c_views:,} วิว")
+        st.columns(2)[1].metric(label="🎯 เป้าหมาย", value=f"{t_views:,} วิว")
+        st.markdown(f"**🔥 ความสำเร็จของโปรเจกต์: {progress_ratio*100:.2f}%**")
         st.progress(progress_ratio)
         if mv_data.get('last_updated', 0) > 0:
             thailand_time = float(mv_data['last_updated']) + 25200 
             update_str = datetime.datetime.fromtimestamp(thailand_time).strftime('%H:%M:%S')
-            st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 ดึงยอดวิวล่าสุดเมื่อเวลา: {update_str} น.</span>", unsafe_allow_html=True)
+            st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 ข้อมูลเมื่อเวลา: {update_str} น.</span>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    col_left_content, col_right_fanbox = st.columns([2.2, 1])
+    # แบ่งหน้าจอพาร์ทล่าง: ซ้ายมือคือชั้นวางผลงานยาวๆ / ขวามือคือตู้จดหมายแฟนคลับ
+    col_shelves_area, col_letter_area = st.columns([2.2, 1])
     
-    with col_left_content:
-        categories = ["วิดีโอทั้งหมด", "Variety / TV", "Online Video / YouTube", "Event / Concert", "🎨 ของแจกสำหรับแฟนๆ"]
-        selected_tabs = st.tabs(categories)
-        df_display = pd.DataFrame(st.session_state.schedules).sort_values(by='date', ascending=False) if st.session_state.schedules else pd.DataFrame()
+    with col_shelves_area:
+        # --------------------------------------------------
+        # 🌟 ชั้นวางที่ 1: 🎨 ของแจกสำหรับแฟนๆ (อยู่อันแรกสุดตามบรีฟ!)
+        # --------------------------------------------------
+        st.markdown('<div class="shelf-title">🎨 แจกรูปภาพและของสมนาคุณสำหรับแฟนๆ</div>', unsafe_allow_html=True)
+        gifts_list = load_gifts()
+        if not gifts_list:
+            st.caption("ขณะนี้ยังไม่มีรูปภาพของแจกเปิดให้ดาวน์โหลด")
+        else:
+            # สร้างกล่องสลับดูรูปเพิ่มเติม
+            if "show_all_gifts" not in st.session_state: st.session_state.show_all_gifts = False
+            # ถ้าไม่กดดูเพิ่ม โชว์แค่ 4 ชิ้นแรกแนวนอน
+            display_gifts = gifts_list if st.session_state.show_all_gifts else gifts_list[:4]
             
-        for i, cat in enumerate(categories):
-            with selected_tabs[i]:
-                if cat == "🎨 ของแจกสำหรับแฟนๆ":
-                    gifts_list = load_gifts()
-                    if not gifts_list: st.caption("ขณะนี้ยังไม่มีรูปภาพแจกฟรี")
-                    else:
-                        g_cols = st.columns(3)
-                        for g_idx, g_item in enumerate(gifts_list):
-                            with g_cols[g_idx % 3]:
-                                st.markdown(f"""
-                                <div class="gift-card">
-                                    <img class="gift-img" src="{g_item['img_url']}">
-                                    <div style="font-weight:bold; font-size:14px; color:#f8fafc; margin-bottom:5px;">{g_item['title']}</div>
-                                    <a class="download-btn" href="{g_item['download_url']}" target="_blank">📥 ดาวน์โหลดรูปเต็ม</a>
-                                </div>
-                                """, unsafe_allow_html=True)
-                else:
-                    if df_display.empty: st.caption("ไม่มีวิดีโอในระบบ")
-                    else:
-                        df_cat = df_display if cat == "วิดีโอทั้งหมด" else df_display[df_display['type'] == cat]
-                        if df_cat.empty: st.caption("ไม่มีวิดีโอในหมวดหมู่นี้")
-                        else:
-                            cat_records = df_cat.to_dict('records')
-                            cols = st.columns(3)
-                            for idx, item in enumerate(cat_records):
-                                with cols[idx % 3]:
-                                    thumb = get_youtube_thumbnail(item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
-                                    st.markdown(f"""
-                                    <div class="video-card">
-                                        <div class="thumbnail-container"><img class="thumbnail-img" src="{thumb}"></div>
-                                        <div class="video-title">{item['title']}</div>
-                                        <div class="video-meta">📅 {item['date']} • {item['type']}</div>
-                                    """, unsafe_allow_html=True)
-                                    if item['note'] and not pd.isna(item['note']): st.markdown(f'<div style="font-size:12px; color:#94a3b8; font-style:italic; margin-top:4px;">💬 {item["note"]}</div>', unsafe_allow_html=True)
-                                    if item['link'] and not pd.isna(item['link']): st.markdown(f'<a class="watch-btn" href="{item["link"]}" target="_blank">▶ ชมคลิป</a>', unsafe_allow_html=True)
-                                    st.markdown("</div>", unsafe_allow_html=True)
-                                    
-    with col_right_fanbox:
+            g_cols = st.columns(4)
+            for g_idx, g_item in enumerate(display_gifts):
+                with g_cols[g_idx % 4]:
+                    st.markdown(f"""
+                    <div class="gift-card">
+                        <img class="gift-img" src="{g_item['img_url']}">
+                        <div class="video-title" style="text-align:center;">{g_item['title']}</div>
+                        <a class="download-btn" href="{g_item['download_url']}" target="_blank">📥 โหลดรูปเต็ม</a>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            # ปุ่มกดดูเพิ่มเติมสไตล์ YouTube ยุบขยายชั้นวางได้
+            if len(gifts_list) > 4:
+                btn_label = "🔼 ยุบแสดงน้อยลง" if st.session_state.show_all_gifts else f"🔽 ดูเพิ่มเติม ({len(gifts_list)-4} รายการ)"
+                if st.button(btn_label, key="toggle_gifts_btn"):
+                    st.session_state.show_all_gifts = not st.session_state.show_all_gifts
+                    st.rerun()
+
+        # โหลดข้อมูลคลังวิดีโอเพื่อเตรียมทำชั้นวางถัดไป
+        all_vids = load_data()
+        df_vids = pd.DataFrame(all_vids).sort_values(by='date', ascending=False) if all_vids else pd.DataFrame()
+        
+        # รายชื่อชั้นวางวิดีโอแนวนอนที่เราจะเรียงต่อลงมา
+        video_shelves = [
+            {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
+            {"type": "Online Video / YouTube", "title": "🔴 คลิปออนไลน์ / YouTube & Social Media Content"},
+            {"type": "Event / Concert", "title": "🎤 งานอีเวนต์และคอนเสิร์ต / Live Events & Concerts"},
+            {"type": "Radio / Podcast", "title": "📻 รายการวิทยุและพอดแคสต์ / Radio & Podcasts"}
+        ]
+        
+        # --------------------------------------------------
+        # 🌟 ชั้นวางถัดๆ มา: วิดีโอแนวนอนแยกตามหมวดหมู่
+        # --------------------------------------------------
+        for shelf in video_shelves:
+            st.markdown(f'<div class="shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
+            
+            if df_vids.empty:
+                st.caption("ยังไม่มีข้อมูลวิดีโอในคลัง")
+                continue
+                
+            df_shelf = df_vids[df_vids['type'] == shelf['type']]
+            if df_shelf.empty:
+                st.caption("ยังไม่มีวิดีโอในหมวดหมู่นี้")
+            else:
+                shelf_records = df_shelf.to_dict('records')
+                
+                # ตัวควบคุมปุ่มดูเพิ่มเติมของแต่ละชั้นงาน
+                state_key = f"show_all_{shelf['type'].replace(' ', '_')}"
+                if state_key not in st.session_state: st.session_state[state_key] = False
+                
+                # ถ้าไม่กดดูเพิ่ม โชว์แค่ 4 คลิปแรกในแถวแนวนอน
+                display_vids = shelf_records if st.session_state[state_key] else shelf_records[:4]
+                
+                v_cols = st.columns(4)
+                for v_idx, v_item in enumerate(display_vids):
+                    with v_cols[v_idx % 4]:
+                        thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                        st.markdown(f"""
+                        <div class="video-card">
+                            <div class="thumbnail-container"><img class="thumbnail-img" src="{thumb}"></div>
+                            <div class="video-title">{v_item['title']}</div>
+                            <div class="video-meta">📅 {v_item['date']}</div>
+                        """, unsafe_allow_html=True)
+                        if v_item['note'] and not pd.isna(v_item['note']): st.markdown(f'<div style="font-size:12px; color:#94a3b8; font-style:italic; margin-top:4px;">💬 {v_item["note"]}</div>', unsafe_allow_html=True)
+                        if v_item['link'] and not pd.isna(v_item['link']): st.markdown(f'<a class="watch-btn" href="{v_item["link"]}" target="_blank">▶ ชมคลิป</a>', unsafe_allow_html=True)
+                        st.markdown("</div>", unsafe_allow_html=True)
+                
+                # ปุ่มกดคลี่ดูเพิ่มเติมเฉพาะชั้นนั้นๆ
+                if len(shelf_records) > 4:
+                    v_btn_label = "🔼 ยุบแถว" if st.session_state[state_key] else f"🔽 ดูเพิ่มเติมในหมวดนี้ ({len(shelf_records)-4} คลิป)"
+                    if st.button(v_btn_label, key=f"btn_{state_key}"):
+                        st.session_state[state_key] = not st.session_state[state_key]
+                        st.rerun()
+
+    with col_letter_area:
+        # 💌 ส่วนกล่องรับข้อความส่งความสุขถึงแอดมินแนท
         st.markdown("<h3 style='color: #10b981; margin-top:0;'>💌 Fan Letter Box</h3>", unsafe_allow_html=True)
-        with st.form(key="fan_message_form", clear_on_submit=True):
+        st.write("ส่งกำลังใจ รีวิวความฟิน หรือทักทายแอดมินแนทได้ที่นี่น้า! (ส่งแบบส่วนตัวถึงหลังบ้านแอดมินคนเดียวเลยครับ)")
+        with st.form(key="fan_message_form_v6", clear_on_submit=True):
             fan_name = st.text_input("ชื่อเล่นของคุณ:")
-            fan_msg = st.text_area("ข้อความถึงแอดมิน:")
-            submit_letter = st.form_submit_button("✉️ ส่งจดหมายลับถึงแอดมิน")
+            fan_msg = st.text_area("ข้อความยาวๆ:")
+            submit_letter = st.form_submit_button("✉️ ส่งจดหมายถึงแอดมิน")
         if submit_letter and fan_msg.strip():
             save_message(fan_name.strip() if fan_name.strip() else "แฟนคลับผู้ไม่ประสงค์ออกนาม", fan_msg.strip())
-            st.success("💖 ส่งจดหมายเรียบร้อยแล้ว!")
+            st.success("💖 ส่งจดหมายสำเร็จ! ขอบคุณมากๆ ครับนัท")
 
 # ==========================================
-# ⚙️ ระบบหลังบ้านจัดการข้อมูล (สำหรับแนท) - แบบยุบหัวข้อ
+# ⚙️ ระบบหลังบ้านจัดการข้อมูล (สำหรับแนท) - แบบพับเก็บ
 # ==========================================
 elif view_mode == "⚙️ ระบบหลังบ้าน (สำหรับแนท)":
     st.subheader("⚙️ ระบบจัดการข้อมูลหลังบ้าน")
     password_input = st.text_input("กรุณาป้อนรหัสผ่านผู้ดูแลระบบ:", type="password")
     
     if password_input == ADMIN_PASSWORD:
-        st.success("🔓 ยืนยันตัวตนสำเร็จ! หน้ายุบฟอร์มเรียบร้อย เลือกคลิกหัวข้อที่ต้องการได้เลยครับแนท")
+        st.success("🔓 ยืนยันตัวตนสำเร็จ! เลือกเปิดกล่องแก้ไขข้อมูลได้เลยครับแนท")
         st.markdown("---")
-        
         if "edit_index" not in st.session_state: st.session_state.edit_index = None
 
-        # -----------------------------------------------------------------
-        # หัวข้อที่ 1: 🎯 ตั้งค่าเพลงโปรเจกต์โฟกัส / MV ล่าสุด
-        # -----------------------------------------------------------------
-        with st.expander("🎯 1. ตั้งค่าเพลงโปรเจกต์โฟกัส / MV ล่าสุด (คลิกเพื่อเปิด-ปิด)"):
+        with st.expander("🎯 1. ตั้งค่าเพลงโปรเจกต์โฟกัส / MV ล่าสุด"):
             curr_mv = load_mv_highlight()
-            with st.form(key="mv_highlight_form_exp"):
-                mv_title_in = st.text_input("ชื่อหัวข้อเพลง:", value=curr_mv['title'])
+            with st.form(key="mv_form_exp"):
+                mv_title_in = st.text_input("ชื่อเพลง:", value=curr_mv['title'])
                 mv_url_in = st.text_input("ลิงก์ YouTube MV:", value=curr_mv['url'])
-                mv_target_in = st.number_input("เป้าหมายยอดวิวความสำเร็จ:", value=int(curr_mv['target_views']), step=10000)
+                mv_target_in = st.number_input("เป้าหมายยอดวิว:", value=int(curr_mv['target_views']), step=10000)
                 mv_current_in = st.number_input("บังคับค่ายอดวิวเริ่มต้นชั่วคราว:", value=int(curr_mv['current_views']))
-                mv_submit = st.form_submit_button("💾 บันทึกโปรเจกต์หลัก")
+                mv_submit = st.form_submit_button("💾 บันทึก")
             if mv_submit:
                 save_mv_highlight(mv_url_in, mv_current_in, mv_target_in, mv_title_in)
                 if os.path.exists(MV_FILE):
-                    df_t = pd.read_csv(MV_FILE)
-                    df_t.loc[0, 'last_updated'] = 0.0
-                    df_t.to_csv(MV_FILE, index=False)
-                st.success("อัปเดตเพลงหลักแล้ว!")
-                st.rerun()
+                    df_t = pd.read_csv(MV_FILE); df_t.loc[0, 'last_updated'] = 0.0; df_t.to_csv(MV_FILE, index=False)
+                st.success("บันทึกเพลงหลักแล้ว!"); st.rerun()
 
-        # -----------------------------------------------------------------
-        # หัวข้อที่ 2: 📝 แก้ไขข้อมูลประกาศสำคัญหน้าแรก
-        # -----------------------------------------------------------------
-        with st.expander("📢 2. แก้ไขข้อมูลกระดานประกาศสำคัญหน้าแรก (คลิกเพื่อเปิด-ปิด)"):
+        with st.expander("📢 2. แก้ไขข้อมูลกระดานประกาศสำคัญหน้าแรก"):
             current_info = load_important_info()
-            new_info_text = st.text_area("ข้อความบอร์ดประกาศหน้าแรก:", value=current_info, height=100)
-            if st.button("💾 บันทึกประกาศหน้าร้าน"):
+            new_info_text = st.text_area("ข้อความประกาศ:", value=current_info, height=100)
+            if st.button("💾 บันทึกประกาศ"):
                 save_important_info(new_info_text)
-                st.success("อัปเดตประกาศสำเร็จ!")
-                st.rerun()
+                st.success("อัปเดตประกาศสำเร็จ!"); st.rerun()
 
-        # -----------------------------------------------------------------
-        # หัวข้อที่ 3: 🎨 จัดการรูปภาพแจกฟรี (Wallpapers / Frames)
-        # -----------------------------------------------------------------
-        with st.expander("🎨 3. จัดการรูปภาพแจกฟรีให้แฟนคลับ (คลิกเพื่อเปิด-ปิด)"):
+        with st.expander("🎨 3. จัดการรูปภาพแจกฟรีให้แฟนคลับ (Wallpapers / Frames)"):
             gifts_data = load_gifts()
             col_g1, col_g2 = st.columns([1, 1.2])
             with col_g1:
-                st.markdown("**➕ เพิ่มของแจกชิ้นใหม่**")
-                with st.form(key="add_gift_form_exp", clear_on_submit=True):
-                    g_title = st.text_input("ชื่อเซ็ตของแจก:")
-                    g_img_url = st.text_input("ลิงก์รูปภาพตัวอย่าง (Thumbnail):")
-                    g_down_url = st.text_input("ลิงก์ดาวน์โหลดรูปเต็ม (Google Drive):")
+                with st.form(key="add_gift_exp_v6", clear_on_submit=True):
+                    g_title = st.text_input("ชื่อของแจก:")
+                    g_img_url = st.text_input("ลิงก์รูปภาพตัวอย่าง:")
+                    g_down_url = st.text_input("ลิงก์ดาวน์โหลดรูปเต็ม:")
                     gift_submit = st.form_submit_button("🚀 อัปโหลดขึ้นหน้าแรก")
                 if gift_submit and g_title and g_img_url and g_down_url:
                     gifts_data.append({"title": g_title, "img_url": g_img_url, "download_url": g_down_url})
-                    save_gifts(gifts_data)
-                    st.success("เพิ่มของแจกเรียบร้อย!")
-                    st.rerun()
+                    save_gifts(gifts_data); st.success("เพิ่มสำเร็จ!"); st.rerun()
             with col_g2:
-                st.markdown("**📋 รายการของแจกปัจจุบัน**")
-                if not gifts_data: st.caption("ยังไม่มีของแจกในระบบ")
                 for g_i, g_item in enumerate(gifts_data):
                     g_c1, g_c2 = st.columns([3, 1])
                     g_c1.write(f"- {g_item['title']}")
-                    if g_c2.button("ลบ", key=f"del_g_{g_i}"):
-                        gifts_data.pop(g_i)
-                        save_gifts(gifts_data)
-                        st.rerun()
+                    if g_c2.button("ลบ", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
-        # -----------------------------------------------------------------
-        # หัวข้อที่ 4: 🎬 จัดการคลังวิดีโอทั่วไปและคิวงาน
-        # -----------------------------------------------------------------
-        with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป (คลิกเพื่อเปิด-ปิด)"):
+        with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
             col_v_form, col_v_manage = st.columns([1, 1.2])
             with col_v_form:
                 if st.session_state.edit_index is not None:
                     st.markdown(f"**📝 แก้ไขวิดีโอรายการที่ {st.session_state.edit_index + 1}**")
                     curr = st.session_state.schedules[st.session_state.edit_index]
                     d_title, d_link, d_note = curr["title"], curr["link"], curr["note"]
-                    d_pinned = bool(curr["pinned"]) if "pinned" in curr else False
                     try: d_date = datetime.datetime.strptime(curr["date"], "%Y-%m-%d").date()
                     except: d_date = datetime.date.today()
                     options = ["Variety / TV", "Online Video / YouTube", "Event / Concert", "Radio / Podcast"]
                     d_type_idx = options.index(curr["type"]) if curr["type"] in options else 0
-                    btn_txt = "🔄 อัปเดตข้อมูลที่แก้ไข"
+                    btn_txt = "🔄 อัปเดต"
                 else:
-                    st.markdown("**➕ เพิ่มวิดีโอรายการใหม่เข้าคลัง**")
-                    d_title, d_link, d_note, d_pinned = "", "", "", False
+                    st.markdown("**➕ เพิ่มวิดีโอใหม่**")
+                    d_title, d_link, d_note = "", "", ""
                     d_date = datetime.date.today()
                     d_type_idx = 0
-                    btn_txt = "🚀 อัปโหลดเข้าคลัง"
+                    btn_txt = "🚀 อัปโหลด"
                     
-                with st.form(key='admin_video_form_exp'):
-                    title = st.text_input("ชื่อคลิปรายการ:", value=d_title)
-                    date_val = st.date_input("วันที่งาน:", value=d_date)
+                with st.form(key='admin_vid_exp_v6'):
+                    title = st.text_input("ชื่อคลิป:", value=d_title)
+                    date_val = st.date_input("วันที่:", value=d_date)
                     w_type = st.selectbox("ประเภท:", ["Variety / TV", "Online Video / YouTube", "Event / Concert", "Radio / Podcast"], index=d_type_idx)
                     link = st.text_input("ลิงก์คลิป:", value=d_link)
-                    note = st.text_area("โน้ตย่อย:", value=d_note)
-                    is_pinned = st.checkbox("📌 ปักหมุดในโซนแนะนำ", value=d_pinned)
+                    note = st.text_area("โน้ตย่อ:", value=d_note)
                     vid_submit = st.form_submit_button(btn_txt)
                     
                 if vid_submit and title.strip():
-                    item_data = {"title": title, "date": str(date_val), "type": w_type, "link": link, "note": note, "pinned": is_pinned}
+                    item_data = {"title": title, "date": str(date_val), "type": w_type, "link": link, "note": note}
                     if st.session_state.edit_index is not None:
                         st.session_state.schedules[st.session_state.edit_index] = item_data
                         st.session_state.edit_index = None
                     else: st.session_state.schedules.append(item_data)
-                    save_data(st.session_state.schedules)
-                    st.success("บันทึกคลังวิดีโอสำเร็จ!")
-                    st.rerun()
+                    save_data(st.session_state.schedules); st.success("สำเร็จ!"); st.rerun()
                 if st.session_state.edit_index is not None:
-                    if st.button("❌ ยกเลิกแก้ไข"):
-                        st.session_state.edit_index = None
-                        st.rerun()
+                    if st.button("❌ Cancel"): st.session_state.edit_index = None; st.rerun()
                         
             with col_v_manage:
-                st.markdown("**📋 รายการวิดีโอปัจจุบัน**")
-                if not st.session_state.schedules: st.caption("ไม่มีรายการในระบบ")
                 for idx, item in enumerate(st.session_state.schedules):
                     v_c1, v_c2, v_c3 = st.columns([3, 0.6, 0.6])
-                    v_c1.write(f"{idx+1}. {item['title']}")
-                    if v_c2.button("📝", key=f"edit_v_{idx}"):
-                        st.session_state.edit_index = idx
-                        st.rerun()
-                    if v_c3.button("🗑️", key=f"del_v_{idx}"):
-                        st.session_state.schedules.pop(idx)
-                        save_data(st.session_state.schedules)
-                        st.rerun()
+                    v_c1.write(f"{idx+1}. {item['title']} ({item['type']})")
+                    if v_c2.button("📝", key=f"edit_v_{idx}"): st.session_state.edit_index = idx; st.rerun()
+                    if v_c3.button("🗑️", key=f"del_v_{idx}"): st.session_state.schedules.pop(idx); save_data(st.session_state.schedules); st.rerun()
 
-        # -----------------------------------------------------------------
-        # หัวข้อที่ 5: 📬 เปิดกล่องจดหมายจากแฟนคลับ (Fan Letters)
-        # -----------------------------------------------------------------
-        with st.expander("📬 5. เปิดกล่องอ่านจดหมายลับจากแฟนคลับ (คลิกเพื่อเปิด-ปิด)"):
+        with st.expander("📬 5. เปิดกล่องอ่านจดหมายลับจากแฟนคลับ (Fan Letters)"):
             messages_list = load_messages()
-            if not messages_list:
-                st.info("ตอนนี้กล่องจดหมายยังว่างอยู่ครับ 🎁")
+            if not messages_list: st.info("กล่องจดหมายว่างอยู่ครับ")
             else:
                 messages_list.reverse()
-                st.write(f"คุณได้รับจดหมายทั้งหมด {len(messages_list)} ฉบับ:")
                 for m_idx, m_item in enumerate(messages_list):
-                    st.markdown(f"""
-                    <div class="letter-card">
-                        <span style="font-size:11px; color:#94a3b8;">📅 {m_item['timestamp']}</span><br>
-                        <span style="font-weight:bold; color:#38bdf8;">👤 คุณ: {m_item['name']}</span><br>
-                        <p style="margin-top:6px; margin-bottom:0; color:#e2e8f0; font-size:14px; white-space: pre-wrap;">💬 {m_item['message']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f'<div class="letter-card"><span style="font-size:11px; color:#94a3b8;">📅 {m_item["timestamp"]}</span><br><span style="font-weight:bold; color:#38bdf8;">👤 คุณ: {m_item["name"]}</span><br><p style="margin-top:4px; color:#e2e8f0; font-size:14px;">💬 {m_item["message"]}</p></div>', unsafe_allow_html=True)
                 if st.button("🗑️ ล้างกล่องจดหมายทั้งหมด"):
                     if os.path.exists(MESSAGES_FILE): os.remove(MESSAGES_FILE)
-                    st.success("ล้างตู้จดหมายเรียบร้อย!")
-                    st.rerun()
-                    
-    elif password_input != "":
-        st.error("รหัสผ่านไม่ถูกต้อง")
+                    st.success("ล้างตู้จดหมายเรียบร้อย!"); st.rerun()
+    elif password_input != "": st.error("รหัสผ่านไม่ถูกต้อง")
