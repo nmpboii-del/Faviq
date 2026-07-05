@@ -316,21 +316,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 """, unsafe_allow_html=True)
 
                 elif t_type == "home_dashboard":
-                    if gifts_list:
-                        st.markdown('<div class="yt-shelf-title">🎨 ล่าสุดจาก Digital Goods โหลดฟรี!</div>', unsafe_allow_html=True)
-                        g_home_cols = st.columns(4)
-                        for g_idx, g_item in enumerate(gifts_list[:4]):
-                            with g_home_cols[g_idx % 4]:
-                                img_src = g_item['img_url']
-                                if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
-                                st.markdown(f"""
-                                <div class="gift-card">
-                                    <div class="gift-img-container"><img class="gift-img" src="{img_src}"></div>
-                                    <div style="font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{g_item["title"]}</div>
-                                    <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
+                    # 🛠️ ย้าย "ผลงานแนะนำยอดนิยม (ปักหมุด)" มาไว้ด้านบนสุดเป็นอันดับที่ 1
                     pinned_vids = [v for v in all_vids if v.get('pinned', False)]
                     if pinned_vids:
                         st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม</div>', unsafe_allow_html=True)
@@ -353,7 +339,23 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                     </div>
                                 </a>
                                 """, unsafe_allow_html=True)
-                    
+
+                    # 🛠️ ย้าย "ล่าสุดจาก Digital Goods" ลงมาอยู่เป็นอันดับที่ 2
+                    if gifts_list:
+                        st.markdown('<div class="yt-shelf-title">🎨 ล่าสุดจาก Digital Goods โหลดฟรี!</div>', unsafe_allow_html=True)
+                        g_home_cols = st.columns(4)
+                        for g_idx, g_item in enumerate(gifts_list[:4]):
+                            with g_home_cols[g_idx % 4]:
+                                img_src = g_item['img_url']
+                                if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
+                                st.markdown(f"""
+                                <div class="gift-card">
+                                    <div class="gift-img-container"><img class="gift-img" src="{img_src}"></div>
+                                    <div style="font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{g_item["title"]}</div>
+                                    <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
                     homepage_shelves = sys_config.get("video_shelves", [])
                     for shelf in homepage_shelves:
                         df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
@@ -388,7 +390,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                     st.session_state[s_key] = not st.session_state[s_key]
                                     st.rerun()
 
-                # 🛠️ แก้ไขเรียบร้อย: เพิ่มเงื่อนไขตรวจสอบว่าถ้าหมวดหมู่ไหนไม่มีคลิป (df_shelf.empty) จะข้ามไปทันที ไม่แสดงแถวว่าง
                 elif t_type == "all_videos":
                     video_shelves = sys_config.get("video_shelves", [])
                     has_any_video = False
