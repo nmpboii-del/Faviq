@@ -33,7 +33,6 @@ ADMIN_PASSWORD = "Nittaya_195"
 
 # --- ฟังก์ชันจัดการโครงสร้างหัวข้อ/หมวดหมู่ระบบ ---
 def load_system_config():
-    # กำหนดค่าเริ่มต้นหากยังไม่มีไฟล์ตั้งค่า
     default_config = {
         "tabs": [
             {"id": "home", "title": "หน้าแรก", "type": "home_dashboard", "target": ""},
@@ -60,7 +59,6 @@ def save_system_config(config_data):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config_data, f, ensure_ascii=False, indent=4)
 
-# โหลดค่าคอนฟิกหัวข้อและแท็บเข้าสู่ระบบ
 sys_config = load_system_config()
 
 # --- ฟังก์ชันระบบช่วยดึงข้อมูล ---
@@ -229,14 +227,22 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-view_mode = st.sidebar.radio("MENU", ["🏠 หน้าแรก", "⚙️ ระบบหลังบ้าน"])
+# 🛠️ ย้ายโหมดจาก Sidebar มาไว้ด้านบนสุดเพื่อให้เลือกง่าย ไม่หลงทาง
+col_header_title, col_header_mode = st.columns([2.5, 1])
+with col_header_title:
+    st.markdown("<h1 style='color: #f8fafc; margin: 0;'>🎬 Faviq Space</h1>", unsafe_allow_html=True)
+with col_header_mode:
+    view_mode = st.segmented_control(
+        "เลือกโหมดการใช้งาน",
+        ["🏠 หน้าแรกแกลเลอรี", "⚙️ ระบบหลังบ้าน"],
+        default="🏠 หน้าแรกแกลเลอรี"
+    )
+st.markdown("---")
 
 # ==========================================
 # 🏠 หน้าแรกแกลเลอรี
 # ==========================================
-if view_mode == "🏠 หน้าแรก":
-    st.markdown("<h2 style='color: #f8fafc; margin-bottom: 5px;'>🎬 Artist Hub & Fan Space</h2>", unsafe_allow_html=True)
-    
+if view_mode == "🏠 หน้าแรกแกลเลอรี":
     gifts_list = load_gifts()
     all_vids = load_data()
     df_vids = pd.DataFrame(all_vids).sort_values(by='date', ascending=False) if all_vids else pd.DataFrame()
@@ -269,22 +275,18 @@ if view_mode == "🏠 หน้าแรก":
             st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 เวลาที่อัปเดตล่าสุด(อัปเดตทุก 10 นาที): {update_str} น.</span>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # --- ดึงรายชื่อแท็บแบบ Dynamic ตามที่ตั้งค่าจากหลังบ้าน ---
+    # ดึงรายชื่อแท็บแบบ Dynamic หลังบ้าน
     defined_tabs = sys_config.get("tabs", [])
     
-    # กรองข้อมูลเฉพาะที่เป็น dictionary และมี key 'title' เพื่อป้องกันบั๊ก TypeError
     valid_tabs = []
     if isinstance(defined_tabs, list):
         for t in defined_tabs:
             if isinstance(t, dict) and "title" in t:
                 valid_tabs.append(t)
-            elif isinstance(t, str):
-                valid_tabs.append({"id": f"tab_gen_{time.time()}", "title": str(t), "type": "all_videos", "target": ""})
 
     if not valid_tabs:
-        st.warning("ยังไม่ได้ตั้งค่าแท็บเมนูในระบบหลังบ้าน หรือโครงสร้างข้อมูลไม่ถูกต้อง")
+        st.warning("ยังไม่ได้ตั้งค่าแท็บเมนูในระบบหลังบ้าน")
     else:
-        # สร้างแท็บแบบไดนามิกตามจำนวนในลิสต์ที่กรองแล้ว
         tab_objects = st.tabs([t["title"] for t in valid_tabs])
         
         for index, tab_info in enumerate(valid_tabs):
@@ -292,9 +294,25 @@ if view_mode == "🏠 หน้าแรก":
                 t_type = tab_info.get("type", "all_videos")
                 t_target = tab_info.get("target", "")
                 
-                # ฟังก์ชันแสดงผลตามประเภทเนื้อหาของแท็บนั้นๆ
                 if t_type == "home_dashboard":
-                    # โซนวิดีโอแนะนำปักหมุด
+                    # 📌 1. โซนของแจก Digital Goods ล่าสุด (ให้ขึ้นโชว์อันแรกสุดของหน้าโฮมตามต้องการ)
+                    if gifts_list:
+                        st.markdown('<div class="yt-shelf-title">🎨 ล่าสุดจาก Digital Goods โหลดฟรี!</div>', unsafe_allow_html=True)
+                        g_home_cols = st.columns(4)
+                        # ดึง 4 ชิ้นล่าสุดมาโชว์ที่หน้าแรก
+                        for g_idx, g_item in enumerate(gifts_list[:4]):
+                            with g_home_cols[g_idx % 4]:
+                                img_src = g_item['img_url']
+                                if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
+                                st.markdown(f"""
+                                <div class="gift-card">
+                                    <div class="gift-img-container"><img class="gift-img" src="{img_src}"></div>
+                                    <div style="font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{g_item["title"]}</div>
+                                    <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                    # 📌 2. โซนวิดีโอแนะนำปักหมุด
                     pinned_vids = [v for v in all_vids if v.get('pinned', False)]
                     if pinned_vids:
                         st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม</div>', unsafe_allow_html=True)
@@ -318,7 +336,7 @@ if view_mode == "🏠 หน้าแรก":
                                 </a>
                                 """, unsafe_allow_html=True)
                     
-                    # โชว์ 2 หมวดหมู่แรกตัวอย่าง
+                    # 📌 3. โชว์วิดีโอทั่วไปรายหมวดหมู่
                     homepage_shelves = sys_config.get("video_shelves", [])[:2]
                     for shelf in homepage_shelves:
                         df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
@@ -374,7 +392,6 @@ if view_mode == "🏠 หน้าแรก":
                                     st.rerun()
 
                 elif t_type == "single_shelf_only":
-                    # แสดงเฉพาะหมวดหมู่วิดีโอที่เจาะจงเลือกมาตัวเดียว
                     st.markdown(f'<div class="yt-shelf-title">📂 หมวดหมู่: {t_target}</div>', unsafe_allow_html=True)
                     df_shelf = df_vids[df_vids['type'] == t_target] if not df_vids.empty else pd.DataFrame()
                     if df_shelf.empty:
@@ -435,31 +452,20 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
         if "edit_index" not in st.session_state: st.session_state.edit_index = None
         if "edit_gift_index" not in st.session_state: st.session_state.edit_gift_index = None
 
-        # ⚙️ Expander เมนูบริหารหัวข้อเว็บบอร์ด แท็บเมนู และหมวดหมู่เนื้อหา แบบไม่จำกัดจำนวน
-        with st.expander("🛠️ [เมนูใหม่] จัดการโครงสร้างแท็บเมนูด้านบน และเพิ่ม/ลดแท็บอิสระ"):
+        with st.expander("🛠️ จัดการโครงสร้างแท็บเมนูด้านบน และเพิ่ม/ลดแท็บอิสระ"):
             st.markdown("### 📋 รายการแท็บปัจจุบันที่มีอยู่บนหน้าหลัก")
-            
             updated_tabs = []
             for t_idx, t_item in enumerate(sys_config.get("tabs", [])):
-                if not isinstance(t_item, dict) or "title" not in t_item:
-                    continue
-                    
+                if not isinstance(t_item, dict) or "title" not in t_item: continue
                 col_t1, col_t2, col_t3, col_t4 = st.columns([1.5, 1.5, 1.5, 0.5])
-                
-                # ปรับแต่งชื่อแสดงผลของแต่ละแท็บ
                 t_title = col_t1.text_input(f"ชื่อป้ายแท็บที่ {t_idx+1}", value=t_item["title"], key=f"tab_title_in_{t_idx}")
-                
-                # แสดงประเภทและเป้าหมายข้อมูล
                 col_t2.caption(f"ประเภทเนื้อหา: `{t_item.get('type', '')}`")
-                if t_item.get('target'):
-                    col_t3.caption(f"เป้าหมายดึงข้อมูล: `{t_item['target']}`")
-                else:
-                    col_t3.caption("-")
+                if t_item.get('target'): col_t3.caption(f"เป้าหมายดึงข้อมูล: `{t_item['target']}`")
+                else: col_t3.caption("-")
                 
-                # ปุ่มลบแท็บทิ้ง
                 if col_t4.button("🗑️", key=f"del_tab_btn_{t_idx}"):
                     if len(sys_config.get("tabs", [])) <= 1:
-                        st.error("ไม่สามารถลบแท็บทั้งหมดได้ ต้องเหลือไว้อย่างน้อย 1 แท็บครับ")
+                        st.error("ต้องเหลือไว้อย่างน้อย 1 แท็บครับ")
                     else:
                         sys_config["tabs"].pop(t_idx)
                         save_system_config(sys_config)
@@ -473,7 +479,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     "target": t_item.get("target", "")
                 })
             
-            # บันทึกการแก้ไขชื่อชื่อแท็บที่มีอยู่เดิม
             if st.button("💾 บันทึกการแก้ไขชื่อแท็บ", key="save_existing_tabs_name"):
                 sys_config["tabs"] = updated_tabs
                 save_system_config(sys_config)
@@ -482,13 +487,12 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
 
             st.markdown("---")
             st.markdown("### ➕ เพิ่มแท็บเมนูใหม่เข้าสู่หน้าหลัก")
-            
             with st.form(key="create_new_tab_form"):
-                new_tab_title = st.text_input("ระบุชื่อแท็บใหม่ที่ต้องการให้แสดง (เช่น 💃 คลิปแดนซ์ / Dance Focus):")
+                new_tab_title = st.text_input("ระบุชื่อแท็บใหม่ที่ต้องการให้แสดง:")
                 new_tab_content_type = st.selectbox(
                     "ระบุประเภทข้อมูลที่จะนำมาแสดงในแท็บนี้:",
                     [
-                        ("home_dashboard", "แดชบอร์ดหน้าแรก (มีประกาศ เพลงโฟกัส และคลังแนะนำ)"),
+                        ("home_dashboard", "แดชบอร์ดหน้าแรก (มีประกาศ เพลงโฟกัส คลังภาพแนะนำ และวิดีโอแนะนำ)"),
                         ("all_videos", "หน้าคลังรวมวิดีโอทุกหมวดหมู่แยกชั้น"),
                         ("single_shelf_only", "ดึงเฉพาะวิดีโอหมวดหมู่ใดหมวดหมู่หนึ่งมาโชว์"),
                         ("digital_goods", "คลังโหลดรูปภาพ Digital Goods"),
@@ -496,29 +500,16 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     ],
                     format_func=lambda x: x[1]
                 )
-                
-                # ดึงลิสต์รายชื่อหมวดหมู่วิดีโอที่มีในระบบ เพื่อใช้ในกรณีเลือกประเภท single_shelf_only
                 shelf_options = [s["type"] for s in sys_config.get("video_shelves", [])]
                 chosen_shelf_target = st.selectbox("กรณีเลือก 'ดึงเฉพาะวิดีโอหมวดหมู่เดียว' ให้ระบุหมวดหมู่เป้าหมายตรงนี้:", shelf_options if shelf_options else ["-"])
-                
                 add_tab_submit = st.form_submit_button("🚀 ยืนยันเพิ่มแท็บเข้าสู่หน้าหลัก")
                 
                 if add_tab_submit and new_tab_title.strip():
                     unique_id = f"tab_{int(time.time())}"
-                    
-                    # ป้องกันการบันทึก tuple ลงไฟล์ json (จุดแก้วิกฤต)
                     actual_type = new_tab_content_type[0] if isinstance(new_tab_content_type, tuple) else new_tab_content_type
                     target_val = chosen_shelf_target if actual_type == "single_shelf_only" else ""
-                    
-                    if "tabs" not in sys_config or not isinstance(sys_config["tabs"], list):
-                        sys_config["tabs"] = []
-                        
-                    sys_config["tabs"].append({
-                        "id": unique_id,
-                        "title": new_tab_title.strip(),
-                        "type": actual_type,
-                        "target": target_val
-                    })
+                    if "tabs" not in sys_config or not isinstance(sys_config["tabs"], list): sys_config["tabs"] = []
+                    sys_config["tabs"].append({"id": unique_id, "title": new_tab_title.strip(), "type": actual_type, "target": target_val})
                     save_system_config(sys_config)
                     st.success(f"เพิ่มแท็บ '{new_tab_title}' สำเร็จแล้ว!")
                     st.rerun()
@@ -526,9 +517,8 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
             st.markdown("---")
             st.markdown("### 📂 จัดการรายชื่อหมวดหมู่ประเภทวิดีโอ (Video Shelves)")
             with st.form(key="add_shelf_form_new"):
-                st.markdown("**➕ สร้างหมวดหมู่วิดีโอใหม่**")
-                new_type_id = st.text_input("รหัสหมวดหมู่ (ภาษาอังกฤษ ห้ามซ้ำ เช่น Vlog / Concert):")
-                new_type_title = st.text_input("ชื่อป้ายหมวดหมู่แสดงผลบนเว็บ (ใส่ Emoji ได้ เช่น 📸 วล็อกไลฟ์สไตล์):")
+                new_type_id = st.text_input("รหัสหมวดหมู่ (ภาษาอังกฤษ ห้ามซ้ำ เช่น Vlog):")
+                new_type_title = st.text_input("ชื่อป้ายหมวดหมู่แสดงผลบนเว็บ (เช่น 📸 วล็อก):")
                 add_shelf_submit = st.form_submit_button("➕ บันทึกหมวดหมู่")
                 if add_shelf_submit and new_type_id.strip() and new_type_title.strip():
                     if not any(s['type'] == new_type_id.strip() for s in sys_config["video_shelves"]):
@@ -536,8 +526,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         save_system_config(sys_config)
                         st.success("เพิ่มหมวดหมู่เรียบร้อย!")
                         st.rerun()
-                    else:
-                        st.error("รหัสหมวดหมู่นี้ซ้ำกับที่มีอยู่แล้ว")
 
             for s_idx, s_item in enumerate(list(sys_config["video_shelves"])):
                 col_s1, col_s2, col_s3 = st.columns([1.5, 2, 0.5])
@@ -550,7 +538,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     st.success("ลบหมวดหมู่สำเร็จ!")
                     st.rerun()
 
-        # ส่วนอื่นคงที่ตามระบบเดิม
         with st.expander("🎯 1. ตั้งค่าเพลงโปรเจกต์โฟกัส"):
             curr_mv = load_mv_highlight()
             with st.form(key="mv_form_exp"):
@@ -570,7 +557,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 save_important_info(new_info_text)
                 st.success("อัปเดตประกาศสำเร็จ!"); st.rerun()
 
-        with st.expander("🎨 3. จัดการ  Digital goods (แก้ไข/ปักหมุด/ลบ)"):
+        with st.expander("🎨 3. จัดการ Digital goods (แก้ไข/ปักหมุด/ลบ)"):
             gifts_data = load_gifts()
             col_g1, col_g2 = st.columns([1, 1.2])
             with col_g1:
@@ -616,7 +603,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         st.session_state["temp_fetched_date"] = fetched_date
                         st.session_state["temp_fetched_link"] = yt_fetch_link
                         st.success("ดึงข้อมูลสำเร็จ!")
-                else: st.warning("กรุณากรอกลิงก์ก่อนกดครับ")
 
             st.markdown("---")
             available_options = [s["type"] for s in sys_config.get("video_shelves", [])]
@@ -625,7 +611,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
             col_v_form, col_v_manage = st.columns([1, 1.2])
             with col_v_form:
                 if st.session_state.edit_index is not None:
-                    st.markdown(f"**📝 แก้ไขวิดีโอรายการที่ {st.session_state.edit_index + 1}**")
                     curr = st.session_state.schedules[st.session_state.edit_index]
                     d_title, d_link, d_note = curr["title"], curr["link"], curr["note"]
                     d_channel = curr.get("channel", "Official Channel")
@@ -635,7 +620,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     d_type_idx = available_options.index(curr["type"]) if curr["type"] in available_options else 0
                     btn_txt = "🔄 อัปเดตวิดีโอ"
                 else:
-                    st.markdown("**➕ เพิ่มวิดีโอใหม่**")
                     d_title = st.session_state.get("temp_fetched_title", "")
                     d_channel = st.session_state.get("temp_fetched_channel", "")
                     d_date = st.session_state.get("temp_fetched_date", datetime.date.today())
