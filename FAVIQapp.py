@@ -246,76 +246,75 @@ view_mode = st.sidebar.radio("MENU", ["🏠 หน้าแรกแกลเล
 # ==========================================
 # 🏠 หน้าแรกแกลเลอรี
 # ==========================================
+# ==========================================
+# 🏠 หน้าแรกแกลเลอรี (ส่วนที่ปรับปรุงใหม่)
+# ==========================================
 if view_mode == "🏠 หน้าแรกแกลเลอรี":
     st.markdown("<h2 style='color: #f8fafc; margin-bottom: 5px;'>🎬 Artist Hub & Fan Space</h2>", unsafe_allow_html=True)
     
+    # ... (ส่วน Billboard และ MV Dashboard คงเดิม) ...
+
+    # ดึงข้อมูลมาเตรียมไว้
     gifts_list = load_gifts()
     all_vids = load_data()
     df_vids = pd.DataFrame(all_vids).sort_values(by='date', ascending=False) if all_vids else pd.DataFrame()
-    
-    important_text = load_important_info()
-    st.markdown(f'<div class="billboard-box"><h4 style="margin-top:0; color:#ef4444; font-size:15px;">📢 ประกาศและข้อมูลสำคัญ</h4><p style="margin-bottom:0; font-size:13px; white-space: pre-wrap;">{important_text}</p></div>', unsafe_allow_html=True)
-    
-    mv_data = load_mv_highlight()
-    st.markdown(f"### 🎵 PROJECT FOCUS: {mv_data['title']}")
-    st.markdown('<div class="mv-dashboard-box">', unsafe_allow_html=True)
-    col_mv_player, col_mv_milestone = st.columns([1.3, 1])
-    with col_mv_player:
-        yt_id = extract_youtube_id(mv_data['url'])
-        if yt_id: st.video(f"https://www.youtube.com/watch?v={yt_id}")
-        else: st.error("ลิงก์เพลงหลักไม่ถูกต้อง")
-    with col_mv_milestone:
-        st.markdown("<h4 style='color: #38bdf8; margin-top:0;'>📊 สถิติเป้าหมายปัจจุบัน </h4>", unsafe_allow_html=True)
-        c_views, t_views = int(mv_data['current_views']), int(mv_data['target_views'])
-        progress_ratio = min(float(c_views / t_views), 1.0) if t_views > 0 else 0.0
-        
-        col_metric1, col_metric2 = st.columns(2)
-        col_metric1.metric(label="📈 ยอดวิวบน YouTube", value=f"{c_views:,} view")
-        col_metric2.metric(label="🎯 เป้าหมาย", value=f"{t_views:,} view")
-        
-        st.markdown(f"**🔥 ความคืบหน้า: {progress_ratio*100:.2f}%**")
-        st.progress(progress_ratio)
-        if mv_data.get('last_updated', 0) > 0:
-            thailand_time = float(mv_data['last_updated']) + 25200 
-            update_str = datetime.datetime.fromtimestamp(thailand_time).strftime('%H:%M:%S')
-            st.write(f"<span style='color:#64748b; font-size:12px;'>🔄 เวลาที่อัปเดตล่าสุด(อัปเดตทุก 10 นาที): {update_str} น.</span>", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    
     defined_tabs = sys_config.get("tabs", [])
-    valid_tabs = []
-    if isinstance(defined_tabs, list):
-        for t in defined_tabs:
-            if isinstance(t, dict) and "title" in t:
-                valid_tabs.append(t)
+    video_shelves = sys_config.get("video_shelves", [])
 
-    if not valid_tabs:
-        st.warning("ยังไม่ได้ตั้งค่าแท็บเมนูในระบบหลังบ้าน")
-    else:
-        tab_objects = st.tabs([t["title"] for t in valid_tabs])
-        
-        for index, tab_info in enumerate(valid_tabs):
-            with tab_objects[index]:
-                t_title_text = str(tab_info.get("title", "")).lower()
-                t_type = str(tab_info.get("type", "")).strip()
-                t_target = tab_info.get("target", "")
-                
-                if t_type == "digital_goods" or "digital" in t_title_text or "good" in t_title_text or "gift" in t_title_text:
-                    st.markdown('<div class="yt-shelf-title">🎨 คลังดาวน์โหลดรูปภาพ Digital Goods ทั้งหมด</div>', unsafe_allow_html=True)
-                    if not gifts_list: 
-                        st.info("ขณะนี้ยังไม่มีรูปภาพเปิดให้ดาวน์โหลด สามารถเพิ่มรูปภาพได้จากระบบหลังบ้านครับ")
-                    else:
-                        g_cols = st.columns(4)
-                        for g_idx, g_item in enumerate(gifts_list):
-                            with g_cols[g_idx % 4]:
-                                img_src = g_item['img_url']
-                                if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
+    # แสดงผลตามแท็บที่ตั้งค่าไว้
+    tab_titles = [t["title"] for t in defined_tabs]
+    tab_objects = st.tabs(tab_titles)
+    
+    for index, tab_info in enumerate(defined_tabs):
+        with tab_objects[index]:
+            t_type = tab_info.get("type")
+            
+            # 1. แท็บหน้าแรก (Dashboard)
+            if t_type == "home_dashboard":
+                # โชว์หมวดหมู่ที่มีวิดีโอ (จำกัด 4 คลิป)
+                for shelf in video_shelves:
+                    df_shelf = df_vids[df_vids['type'] == shelf['type']]
+                    if not df_shelf.empty:
+                        st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
+                        v_cols = st.columns(4)
+                        for v_idx, v_item in enumerate(df_shelf.head(4).to_dict('records')):
+                            with v_cols[v_idx % 4]:
+                                thumb = get_youtube_thumbnail(v_item['link'])
                                 st.markdown(f"""
-                                <div class="gift-card">
-                                    <div class="gift-img-container"><img class="gift-img" src="{img_src}"></div>
-                                    <div style="font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{g_item["title"]}</div>
-                                    <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
-                                </div>
+                                <a href="{v_item['link']}" target="_blank" class="yt-video-card-link">
+                                    <div class="yt-video-card">
+                                        <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
+                                        <div class="yt-video-title">{v_item["title"]}</div>
+                                    </div>
+                                </a>
                                 """, unsafe_allow_html=True)
+                        
+                        # ปุ่มกดไปดูเพิ่มเติม (ไปที่แท็บวิดีโอทั้งหมด)
+                        if len(df_shelf) > 4:
+                            st.info(f"👉 ดูวิดีโอในหมวด '{shelf['title']}' เพิ่มเติมได้ที่แท็บ 'วิดีโอทั้งหมด'")
+
+            # 2. แท็บวิดีโอทั้งหมด (โชว์ทุกอัน)
+            elif t_type == "all_videos":
+                for shelf in video_shelves:
+                    df_shelf = df_vids[df_vids['type'] == shelf['type']]
+                    if not df_shelf.empty:
+                        st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
+                        # แสดงทุกคลิป (ใช้ Layout grid 4 คอลัมน์)
+                        records = df_shelf.to_dict('records')
+                        cols = st.columns(4)
+                        for i, record in enumerate(records):
+                            with cols[i % 4]:
+                                thumb = get_youtube_thumbnail(record['link'])
+                                st.markdown(f"""
+                                <a href="{record['link']}" target="_blank" class="yt-video-card-link">
+                                    <div class="yt-video-card">
+                                        <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
+                                        <div class="yt-video-title">{record["title"]}</div>
+                                    </div>
+                                </a>
+                                """, unsafe_allow_html=True)
+
+            # ... (ส่วนอื่นๆ เช่น digital_goods หรือ fan_letters คงเดิม) ...
 
                 elif t_type == "home_dashboard":
                     if gifts_list:
