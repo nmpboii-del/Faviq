@@ -61,7 +61,7 @@ def save_system_config(config_data):
 
 sys_config = load_system_config()
 
-# --- ฟังก์ชันระบบช่วยดึงข้อมูล (ปรับปรุงใหม่ รองรับขีดกลาง - แบบในรูปภาพ image_28a921.png) ---
+# --- ฟังก์ชันระบบช่วยดึงข้อมูล ---
 def extract_youtube_id(url):
     if not url or pd.isna(url): return None
     regex_list = [
@@ -85,7 +85,6 @@ def fetch_youtube_details(url):
     channel = "Official Channel"
     if not video_id: return title, channel, default_date
     
-    # วิธีที่ 1: ดึงผ่าน oEmbed (ปลอดภัยและเร็วที่สุด)
     try:
         embed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
         res = requests.get(embed_url, timeout=5)
@@ -96,7 +95,6 @@ def fetch_youtube_details(url):
             return title, channel, default_date
     except: pass
     
-    # วิธีที่ 2: ดึงตรงจากหน้าเว็บ (Fallback สำรอง)
     try:
         watch_url = f"https://www.youtube.com/watch?v={video_id}"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "th-TH,th;q=0.9"}
@@ -372,12 +370,14 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                             for v_idx, v_item in enumerate(display_vids):
                                 with v_cols[v_idx % 4]:
                                     thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                                    # 🛠️ แก้ไขตรงนี้: เพิ่มการโชว์ชื่อช่อง (channel) ในหน้าหลักแต่ละหมวดหมู่
                                     st.markdown(f"""
                                     <a href="{v_item['link']}" target="_blank" class="yt-video-card-link">
                                         <div class="yt-video-card">
                                             <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
                                             <div class="yt-video-details">
                                                 <div class="yt-video-title">{v_item["title"]}</div>
+                                                <div class="yt-video-channel">👤 {v_item.get('channel', 'Official Channel')}</div>
                                                 <div class="yt-video-meta">📅 {v_item["date"]}</div>
                                             </div>
                                         </div>
@@ -393,7 +393,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                     video_shelves = sys_config.get("video_shelves", [])
                     for shelf in video_shelves:
                         df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
-                        # ปรับปรุงตรงนี้: สำหรับแท็บ "วิดีโอทั้งหมด" จะเช็คว่าถ้าไม่มีคลิปในหมวดนี้ จะข้ามไปเลย ไม่เอามาแสดงผล
                         if not df_shelf.empty:
                             st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
                             shelf_records = df_shelf.to_dict('records')
@@ -405,12 +404,14 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                             for v_idx, v_item in enumerate(display_vids):
                                 with v_cols[v_idx % 4]:
                                     thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                                    # 🛠️ แก้ไขตรงนี้ด้วย: เพิ่มการโชว์ชื่อช่อง (channel) ในคลังวิดีโอทั้งหมด
                                     st.markdown(f"""
                                     <a href="{v_item['link']}" target="_blank" class="yt-video-card-link">
                                         <div class="yt-video-card">
                                             <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
                                             <div class="yt-video-details">
                                                 <div class="yt-video-title">{v_item["title"]}</div>
+                                                <div class="yt-video-channel">👤 {v_item.get('channel', 'Official Channel')}</div>
                                                 <div class="yt-video-meta">📅 {v_item["date"]}</div>
                                             </div>
                                         </div>
@@ -431,12 +432,14 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         for v_idx, v_item in enumerate(df_shelf.to_dict('records')):
                             with v_cols[v_idx % 4]:
                                 thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                                # 🛠️ แก้ไขตรงนี้ด้วย: สำหรับแท็บดึงหมวดหมู่เดี่ยวแบบเจาะจง
                                 st.markdown(f"""
                                 <a href="{v_item['link']}" target="_blank" class="yt-video-card-link">
                                     <div class="yt-video-card">
                                         <div class="yt-thumbnail-container"><img class="yt-thumbnail-img" src="{thumb}"></div>
                                         <div class="yt-video-details">
                                             <div class="yt-video-title">{v_item["title"]}</div>
+                                            <div class="yt-video-channel">👤 {v_item.get('channel', 'Official Channel')}</div>
                                             <div class="yt-video-meta">📅 {v_item["date"]}</div>
                                         </div>
                                     </div>
@@ -605,9 +608,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if g_c3.button("📝", key=f"edit_g_{g_i}"): st.session_state.edit_gift_index = g_i; st.rerun()
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
-        # =========================================================================
-        # 🎬 4. ส่วนจัดระเบียบวิดีโอ (อัปเดตรองรับ ID มีขีดกลาง และป้องกันปัญหากล่องว่าง)
-        # =========================================================================
         with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
             st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
             
@@ -650,7 +650,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     d_note, d_pinned, d_type_idx = "", False, 0
                     btn_txt = "🚀 อัปโหลดเข้าคลัง"
                 
-                # 🛠️ โครงสร้าง Form v13 ปล่อยค่า Value วิ่งตาม Session แบบไม่มีคีย์ย้อนกลับ มั่นใจได้ว่าค่าไม่ค้างและไม่พัง
                 with st.form(key='admin_vid_form_v13'):
                     title = st.text_input("ชื่อคลิป:", value=d_title)
                     channel = st.text_input("ชื่อช่องต้นทาง:", value=d_channel)
@@ -658,7 +657,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     w_type = st.selectbox("ประเภท:", available_options, index=d_type_idx)
                     link = st.text_input("ลิงก์คลิป:", value=d_link)
                     note = st.text_area("โน้ตย่อ:", value=d_note)
-                    is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=d_pinned)
+                    is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=is_pinned) # นำ d_pinned มาครอบคลุมที่นี่
                     vid_submit = st.form_submit_button(btn_txt)
                 
                 if vid_submit and title.strip():
