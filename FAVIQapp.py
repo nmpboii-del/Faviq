@@ -204,6 +204,7 @@ def load_gifts():
         df = pd.read_csv(GIFTS_FILE)
         if 'pinned' not in df.columns: df['pinned'] = False
         else: df['pinned'] = df['pinned'].astype(bool)
+        if 'description' not in df.columns: df['description'] = ""
         return df.to_dict('records')
     return []
 
@@ -366,10 +367,12 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                             with g_cols[g_idx % 4]:
                                 img_src = g_item['img_url']
                                 if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
+                                desc_html = f'<div style="font-size:12px; color:#94a3b8; margin-bottom:8px; min-height:18px; display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical; overflow:hidden;">{g_item.get("description", "")}</div>' if g_item.get("description") else '<div style="margin-bottom:8px;"></div>'
                                 st.markdown(f"""
                                 <div class="gift-card">
                                     <div class="gift-img-container"><img class="gift-img" src="{img_src}"></div>
                                     <div style="font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{g_item["title"]}</div>
+                                    {desc_html}
                                     <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
                                 </div>
                                 """, unsafe_allow_html=True)
@@ -406,7 +409,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         event_list = load_event_schedules()
                         today = datetime.date.today()
                         
-                        # 💡 แก้ไขจุดที่ 1: กรอง "ซ่อนงานที่วันที่เลยมาแล้ว" ออกไปจากหน้าแรกทันที
                         upcoming_events = []
                         for ev in event_list:
                             try:
@@ -414,10 +416,9 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 if ev_date_obj >= today:
                                     upcoming_events.append(ev)
                             except:
-                                upcoming_events.append(ev) # ถ้าอ่านฟอร์แมตไม่ได้ให้ติดไว้ก่อนกันข้อมูลหลุด
+                                upcoming_events.append(ev)
                                 
                         if upcoming_events:
-                            # โชว์เฉพาะ 3 อันแรกสุดที่เป็นอนาคต
                             for ev in upcoming_events[:3]:
                                 display_day = extract_only_day_num(ev.get('วันที่', '-'))
                                 note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
@@ -447,10 +448,12 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                             with g_home_cols[g_idx % 4]:
                                 img_src = g_item['img_url']
                                 if img_src and not str(img_src).startswith("http"): img_src = f"data:image/png;base64,{img_src}"
+                                desc_html = f'<div style="font-size:12px; color:#94a3b8; margin-bottom:8px; min-height:18px; display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical; overflow:hidden;">{g_item.get("description", "")}</div>' if g_item.get("description") else '<div style="margin-bottom:8px;"></div>'
                                 st.markdown(f"""
                                 <div class="gift-card">
                                     <div class="gift-img-container"><img class="gift-img" src="{img_src}"></div>
                                     <div style="font-size:14px; font-weight:600; color:#f8fafc; margin-bottom:5px;">{g_item["title"]}</div>
+                                    {desc_html}
                                     <a class="download-btn" href="{g_item["download_url"]}" target="_blank">📥 โหลดรูปเต็ม</a>
                                 </div>
                                 """, unsafe_allow_html=True)
@@ -551,9 +554,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </a>
                                 """, unsafe_allow_html=True)
 
-                # ==========================================================
-                # 🗓️ แก้ไขจุดที่ 2 และ 3: เปลี่ยนอดีตเป็นสีเทา + จัดหมวดหมู่รายเดือน
-                # ==========================================================
                 elif t_type == "artist_events_all":
                     st.markdown('<div class="yt-shelf-title">🗓️ คลังข้อมูลตารางงานศิลปินทั้งหมด</div>', unsafe_allow_html=True)
                     event_list = load_event_schedules()
@@ -562,7 +562,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                     if not event_list:
                         st.info("ขณะนี้ไม่มีข้อมูลตารางงานในระบบ")
                     else:
-                        # แยกกลุ่มข้อมูลออกเป็นกลุ่มรายเดือนตามความต้องการ
                         events_by_month = {}
                         for ev in event_list:
                             month_key = get_thai_month_year(ev.get('วันที่', ''))
@@ -570,7 +569,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 events_by_month[month_key] = []
                             events_by_month[month_key].append(ev)
                         
-                        # วนลูปแสดงแยกทีละหมวดหมู่เดือน
                         for month_name, items in events_by_month.items():
                             st.markdown(f'<div class="month-group-title">📅 ประจำเดือน: {month_name}</div>', unsafe_allow_html=True)
                             
@@ -578,7 +576,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 display_day = extract_only_day_num(ev.get('วันที่', '-'))
                                 note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
                                 
-                                # ตรวจสอบว่าเป็นงานในอดีตหรือไม่ เพื่อสลับสไตล์สีเทา
                                 is_past = False
                                 try:
                                     ev_date_obj = datetime.datetime.strptime(ev.get('วันที่', ''), "%Y-%m-%d").date()
@@ -587,7 +584,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 except:
                                     pass
                                 
-                                # สลับ HTML Class ตามสถานะปัจจุบัน/อดีต
                                 box_class = "schedule-item-box past-event" if is_past else "schedule-item-box"
                                 badge_style = "background-color: #64748b; color:#fff; box-shadow: none;" if is_past else "background-color: #3b82f6; color:#fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);"
                                 title_style = "color: #94a3b8; font-size: 19px; text-decoration: line-through;" if is_past else "color: #60a5fa; font-size: 19px;"
@@ -743,13 +739,15 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 if st.session_state.edit_gift_index is not None:
                     curr_gift = gifts_data[st.session_state.edit_gift_index]
                     default_g_title, default_g_down = curr_gift['title'], curr_gift['download_url']
+                    default_g_desc = curr_gift.get('description', '')
                     default_g_pin = bool(curr_gift.get('pinned', False))
                     gift_btn_txt = "🔄 อัปเดตข้อมูลของแจก"
                 else:
-                    default_g_title, default_g_down, default_g_pin = "", "", False
+                    default_g_title, default_g_down, default_g_desc, default_g_pin = "", "", "", False
                     gift_btn_txt = "🚀 อัปโหลดขึ้นหน้าแรก"
                 with st.form(key="add_gift_exp_v8"):
                     g_title = st.text_input("ชื่อของแจก:", value=default_g_title)
+                    g_desc = st.text_area("รายละเอียด / คำอธิบาย:", value=default_g_desc, help="รายละเอียดสั้นๆ เกี่ยวกับไฟล์นี้")
                     uploaded_img_file = st.file_uploader("เลือกรูปภาพตัวอย่างใหม่:", type=["png", "jpg", "jpeg"])
                     g_down_url = st.text_input("ลิงก์ดาวน์โหลดรูปเต็ม:", value=default_g_down)
                     g_is_pinned = st.checkbox("📌 ปักหมุดในโซนแนะนำ", value=default_g_pin)
@@ -758,10 +756,23 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     base64_img = None
                     if uploaded_img_file: base64_img = base64.b64encode(uploaded_img_file.getvalue()).decode()
                     if st.session_state.edit_gift_index is not None:
-                        gifts_data[st.session_state.edit_gift_index] = {"title": g_title, "download_url": g_down_url, "pinned": g_is_pinned, "img_url": base64_img if base64_img else gifts_data[st.session_state.edit_gift_index]['img_url']}
+                        gifts_data[st.session_state.edit_gift_index] = {
+                            "title": g_title, 
+                            "description": g_desc,
+                            "download_url": g_down_url, 
+                            "pinned": g_is_pinned, 
+                            "img_url": base64_img if base64_img else gifts_data[st.session_state.edit_gift_index]['img_url']
+                        }
                         st.session_state.edit_gift_index = None
                     else:
-                        if uploaded_img_file: gifts_data.append({"title": g_title, "img_url": base64_img, "download_url": g_down_url, "pinned": g_is_pinned})
+                        if uploaded_img_file: 
+                            gifts_data.append({
+                                "title": g_title, 
+                                "description": g_desc,
+                                "img_url": base64_img, 
+                                "download_url": g_down_url, 
+                                "pinned": g_is_pinned
+                            })
                     save_gifts(gifts_data); st.rerun()
             with col_g2:
                 for g_i, g_item in enumerate(gifts_data):
