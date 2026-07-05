@@ -176,24 +176,27 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
     
     with col_shelves_area:
         # --------------------------------------------------
-        # 🌟 ชั้นวางที่ 1: 🎨 ของแจกสำหรับแฟนๆ (อยู่อันแรกสุดตามบรีฟ!)
-        # --------------------------------------------------
+        # 🌟 ชั้นวางที่ 1: 🎨 ของแจกสำหรับแฟนๆ
         st.markdown('<div class="shelf-title">🎨 แจกรูปภาพและของสมนาคุณสำหรับแฟนๆ</div>', unsafe_allow_html=True)
         gifts_list = load_gifts()
         if not gifts_list:
             st.caption("ขณะนี้ยังไม่มีรูปภาพของแจกเปิดให้ดาวน์โหลด")
         else:
-            # สร้างกล่องสลับดูรูปเพิ่มเติม
             if "show_all_gifts" not in st.session_state: st.session_state.show_all_gifts = False
-            # ถ้าไม่กดดูเพิ่ม โชว์แค่ 4 ชิ้นแรกแนวนอน
             display_gifts = gifts_list if st.session_state.show_all_gifts else gifts_list[:4]
             
             g_cols = st.columns(4)
             for g_idx, g_item in enumerate(display_gifts):
                 with g_cols[g_idx % 4]:
+                    # ประกันเรื่องพาธหรือรหัสรูปภาพ
+                    img_src = g_item['img_url']
+                    # ถ้าเป็นรหัสรูปภาพที่อัปโหลดมา จะไม่มี http ขึ้นต้น ให้เติมส่วนหัว Base64
+                    if img_src and not str(img_src).startswith("http"):
+                        img_src = f"data:image/png;base64,{img_src}"
+                        
                     st.markdown(f"""
                     <div class="gift-card">
-                        <img class="gift-img" src="{g_item['img_url']}">
+                        <img class="gift-img" src="{img_src}">
                         <div class="video-title" style="text-align:center;">{g_item['title']}</div>
                         <a class="download-btn" href="{g_item['download_url']}" target="_blank">📥 โหลดรูปเต็ม</a>
                     </div>
