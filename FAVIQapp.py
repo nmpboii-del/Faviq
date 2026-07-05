@@ -62,7 +62,7 @@ def save_system_config(config_data):
 
 sys_config = load_system_config()
 
-# --- ฟังก์ชันระบบจัดการตารางงานศิลปิน (เพิ่มใหม่) ---
+# --- ฟังก์ชันระบบจัดการตารางงานศิลปิน ---
 def load_event_schedules():
     if os.path.exists(EVENT_SCHEDULE_FILE):
         try:
@@ -237,7 +237,7 @@ st.markdown(
     .yt-video-channel { font-size: 12px; color: #ef4444; font-weight: 500; margin-bottom: 2px; }
     .yt-video-meta { font-size: 12px; color: #94a3b8; }
     
-    /* สไตล์การ์อร์ตารางงานตามรูปภาพแบบ Custom */
+    /* สไตล์การ์ดตารางงาน */
     .schedule-item-box { display: flex; align-items: center; background-color: #0d1321; border-radius: 12px; padding: 15px; margin-bottom: 15px; border: 1px solid #1e293b; }
     .schedule-date-badge { flex-shrink: 0; width: 75px; height: 75px; background-color: #facc15; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: #000; box-shadow: 0 4px 10px rgba(250, 204, 21, 0.2); margin-right: 18px; text-align: center; line-height: 1; }
     .schedule-content-info { flex-grow: 1; color: #f1f5f9; }
@@ -340,7 +340,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 """, unsafe_allow_html=True)
 
                 elif t_type == "home_dashboard":
-                    # 🛠️ แบ่งเป็น 2 ส่วน ซ้าย-ขวา (ฝั่งซ้าย: คลิปปักหมุดใหญ่เต็มๆ | ฝั่งขวา: ตารางงานสไตล์แบรนดิ้งเหลือง-ดำ)
                     col_dashboard_left, col_dashboard_right = st.columns([1, 1])
                     
                     with col_dashboard_left:
@@ -373,7 +372,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         if event_list:
                             for ev in event_list:
                                 note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
-                                # 🛠️ อัปเดตโครงสร้าง HTML ตรงนี้ แยกหัวข้อ Location ไว้บรรทัดบน และเคาะข้อมูลสถานที่ลงไปเยื้องบรรทัดล่าง
                                 st.markdown(f"""
                                 <div class="schedule-item-box">
                                     <div class="schedule-date-badge">{ev.get('วันที่', '-')}</div>
@@ -393,7 +391,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
 
                     st.markdown("---")
 
-                    # 🛠️ ย้าย "ล่าสุดจาก Digital Goods" ลงมาอยู่เป็นอันดับที่ 2
                     if gifts_list:
                         st.markdown('<div class="yt-shelf-title">🎨 ล่าสุดจาก Digital Goods โหลดฟรี!</div>', unsafe_allow_html=True)
                         g_home_cols = st.columns(4)
@@ -525,8 +522,10 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
         st.success("🔓 ยืนยันตัวตนสำเร็จ!")
         st.markdown("---")
         
+        # --- กำหนดตัวแปรสำหรับจำค่าการแก้ไข (State) ---
         if "edit_index" not in st.session_state: st.session_state.edit_index = None
         if "edit_gift_index" not in st.session_state: st.session_state.edit_gift_index = None
+        if "edit_event_index" not in st.session_state: st.session_state.edit_event_index = None
 
         with st.expander("🛠️ จัดการโครงสร้างแท็บเมนูด้านบน และเพิ่ม/ลดแท็บอิสระ"):
             st.markdown("### 📋 รายการแท็บปัจจุบันที่มีอยู่บนหน้าหลัก")
@@ -668,45 +667,77 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
         # =========================================================================
-        # 🗓️ ส่วนสำหรับจัดการกรอกข้อมูลตารางงานศิลปิน
+        # 🗓️ ส่วนสำหรับจัดการข้อมูลตารางงานศิลปิน (เพิ่มระบบแก้ไขข้อมูลแล้ว)
         # =========================================================================
-        with st.expander("🗓️ จัดการตารางงานศิลปิน (เพิ่ม/ลบตารางงานปัจจุบัน)"):
-            st.markdown("### ➕ เพิ่มรายการตารางงานใหม่")
-            with st.form(key="add_event_schedule_form", clear_on_submit=True):
-                ev_date = st.text_input("วันที่ (เช่น 02, 11 Update, 19 หรือระบุเต็มรูปแบบ):")
-                ev_title = st.text_input("รายการ / ชื่องาน:")
-                ev_time = st.text_input("เวลา (เช่น 21:45 น. หรือ 15.30):")
-                ev_location = st.text_input("สถานที่ / ช่องทางการรับชม:")
-                ev_note = st.text_input("หมายเหตุเล็กๆ:")
-                submit_event = st.form_submit_button("💾 บันทึกตารางงาน")
+        with st.expander("🗓️ จัดการตารางงานศิลปิน (เพิ่ม/แก้ไข/ลบตารางงานปัจจุบัน)"):
+            current_events_list = load_event_schedules()
+            
+            # ตรวจสอบค่าเริ่มต้นฟอร์มกรณีมีการกดแก้ไข (Edit State)
+            if st.session_state.edit_event_index is not None:
+                st.markdown("### 📝 แก้ไขรายการตารางงาน")
+                ev_curr = current_events_list[st.session_state.edit_event_index]
+                default_ev_date = ev_curr.get("วันที่", "")
+                default_ev_title = ev_curr.get("รายการ", "")
+                default_ev_time = ev_curr.get("เวลา", "")
+                default_ev_location = ev_curr.get("สถานที่/ช่อง", "")
+                default_ev_note = ev_curr.get("หมายเหตุ", "")
+                event_btn_txt = "🔄 อัปเดตตารางงาน"
+            else:
+                st.markdown("### ➕ เพิ่มรายการตารางงานใหม่")
+                default_ev_date, default_ev_title, default_ev_time, default_ev_location, default_ev_note = "", "", "", "", ""
+                event_btn_txt = "💾 บันทึกตารางงาน"
+                
+            with st.form(key="add_event_schedule_form", clear_on_submit=False):
+                ev_date = st.text_input("วันที่ (เช่น 02, 11 Update, 19):", value=default_ev_date)
+                ev_title = st.text_input("รายการ / ชื่องาน:", value=default_ev_title)
+                ev_time = st.text_input("เวลา (เช่น 21:45 น. หรือ 15.30):", value=default_ev_time)
+                ev_location = st.text_input("สถานที่ / ช่องทางการรับชม:", value=default_ev_location)
+                ev_note = st.text_input("หมายเหตุเล็กๆ:", value=default_ev_note)
+                submit_event = st.form_submit_button(event_btn_txt)
                 
                 if submit_event and ev_title.strip():
-                    current_events = load_event_schedules()
-                    current_events.append({
+                    item_event_data = {
                         "วันที่": clean_html_tags(ev_date),
                         "รายการ": clean_html_tags(ev_title),
                         "เวลา": clean_html_tags(ev_time),
                         "สถานที่/ช่อง": clean_html_tags(ev_location),
                         "หมายเหตุ": clean_html_tags(ev_note)
-                    })
-                    save_event_schedules(current_events)
-                    st.success("เพิ่มข้อมูลลงตารางงานสำเร็จแล้ว!")
+                    }
+                    if st.session_state.edit_event_index is not None:
+                        current_events_list[st.session_state.edit_event_index] = item_event_data
+                        st.session_state.edit_event_index = None
+                        st.success("อัปเดตตารางงานสำเร็จแล้ว!")
+                    else:
+                        current_events_list.append(item_event_data)
+                        st.success("เพิ่มข้อมูลลงตารางงานสำเร็จแล้ว!")
+                        
+                    save_event_schedules(current_events_list)
+                    st.rerun()
+                    
+            if st.session_state.edit_event_index is not None:
+                if st.button("❌ ยกเลิกการแก้ไข"):
+                    st.session_state.edit_event_index = None
                     st.rerun()
             
             st.markdown("---")
             st.markdown("### 📋 ตารางงานทั้งหมดที่มีในระบบ")
-            current_events_list = load_event_schedules()
             if not current_events_list:
                 st.info("ขณะนี้ยังไม่มีรายการตารางงาน")
             else:
                 for ev_idx, ev_item in enumerate(current_events_list):
-                    col_ev_info, col_ev_del = st.columns([4, 1])
-                    col_ev_info.write(f"**[{ev_item.get('วันที่', '-')}] {ev_item.get('รายการ', '-')}** | เวลา: {ev_item.get('เวลา', '-')} | สถานที่/ช่อง: {ev_item.get('สถานที่/ช่อง', '-')} | หมายเหตุ: {ev_item.get('หมายเหตุ', '-')}")
-                    if col_ev_del.button("🗑️ ลบงานนี้", key=f"del_ev_btn_{ev_idx}"):
-                        current_events_list.pop(ev_idx)
-                        save_event_schedules(current_events_list)
-                        st.success("ลบรายการสำเร็จ!")
-                        st.rerun()
+                    col_ev_info, col_ev_actions = st.columns([3.5, 1.5])
+                    with col_ev_info:
+                        st.write(f"**[{ev_item.get('วันที่', '-').replace('.0', '')}] {ev_item.get('รายการ', '-')}** \n<br><span style='color:#facc15; font-size:12px;'>⏰ เวลา: {ev_item.get('เวลา', '-')} | 📍 สถานที่/ช่อง: {ev_item.get('สถานที่/ช่อง', '-')} | 💬 หมายเหตุ: {ev_item.get('หมายเหตุ', '-')}</span>", unsafe_allow_html=True)
+                    with col_ev_actions:
+                        act_c1, act_c2 = st.columns(2)
+                        if act_c1.button("📝 แก้ไข", key=f"edit_ev_btn_{ev_idx}"):
+                            st.session_state.edit_event_index = ev_idx
+                            st.rerun()
+                        if act_c2.button("🗑️ ลบงาน", key=f"del_ev_btn_{ev_idx}"):
+                            current_events_list.pop(ev_idx)
+                            save_event_schedules(current_events_list)
+                            st.success("ลบรายการสำเร็จ!")
+                            st.rerun()
 
         # =========================================================================
         # 🎬 4. ส่วนจัดระเบียบวิดีโอ
