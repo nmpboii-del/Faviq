@@ -307,12 +307,12 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-view_mode = st.sidebar.radio("MENU", ["🏠 หน้าแรกแกลเลอรี", "⚙️ ระบบหลังบ้าน"])
+view_mode = st.sidebar.radio("MENU", ["🏠 HOME", "⚙️ SYSTEM"])
 
 # ==========================================
 # 🏠 หน้าแรกแกลเลอรี
 # ==========================================
-if view_mode == "🏠 หน้าแรกแกลเลอรี":
+if view_mode == "🏠 HOME":
     # 🖼️ แสดงรูปภาพส่วนหัวเพจ (Header) ด้านบนสุดของหน้าแกลเลอรี
     st.image(HEADER_IMAGE_URL, use_container_width=True)
     
@@ -369,9 +369,9 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                 t_target = tab_info.get("target", "")
                 
                 if t_type == "digital_goods" or "digital" in t_title_text or "good" in t_title_text or "gift" in t_title_text:
-                    st.markdown('<div class="yt-shelf-title">🎨 คลังดาวน์โหลดรูปภาพ Digital Goods ทั้งหมด</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="yt-shelf-title">🎨 Digital Goods </div>', unsafe_allow_html=True)
                     if not gifts_list: 
-                        st.info("ขณะนี้ยังไม่มีรูปภาพเปิดให้ดาวน์โหลด สามารถเพิ่มรูปภาพได้จากระบบหลังบ้านครับ")
+                        st.info("ขณะนี้ยังไม่มีรูปภาพเปิดให้ดาวน์โหลด ")
                     else:
                         g_cols = st.columns(4)
                         for g_idx, g_item in enumerate(gifts_list):
@@ -392,7 +392,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                     col_dashboard_left, col_dashboard_right = st.columns([1, 1])
                     
                     with col_dashboard_left:
-                        st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำยอดนิยม (คลิปปักหมุด)</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="yt-shelf-title">📌 ผลงานแนะนำ </div>', unsafe_allow_html=True)
                         pinned_vids = [v for v in all_vids if v.get('pinned', False)]
                         if pinned_vids:
                             for pv_idx, pv_item in enumerate(pinned_vids):
@@ -416,7 +416,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                             st.info("ยังไม่มีคลิปปักหมุดในขณะนี้")
                             
                     with col_dashboard_right:
-                        st.markdown('<div class="yt-shelf-title">📅 ตารางงานศิลปิน (เฉพาะงานที่กำลังจะถึง)</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="yt-shelf-title">📅 ตารางงาน FAVIQ (ที่กำลังจะถึง)</div>', unsafe_allow_html=True)
                         event_list = load_event_schedules()
                         today = datetime.date.today()
                         
@@ -453,7 +453,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                     st.markdown("---")
 
                     if gifts_list:
-                        st.markdown('<div class="yt-shelf-title">🎨 ล่าสุดจาก Digital Goods โหลดฟรี!</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="yt-shelf-title">🎨 Digital Goods </div>', unsafe_allow_html=True)
                         g_home_cols = st.columns(4)
                         for g_idx, g_item in enumerate(gifts_list[:4]):
                             with g_home_cols[g_idx % 4]:
@@ -566,7 +566,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 """, unsafe_allow_html=True)
 
                 elif t_type == "artist_events_all":
-                    st.markdown('<div class="yt-shelf-title">🗓️ คลังข้อมูลตารางงานศิลปินทั้งหมด</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="yt-shelf-title">🗓️ ตารางงานทั้งหมด </div>', unsafe_allow_html=True)
                     event_list = load_event_schedules()
                     today = datetime.date.today()
                     
@@ -623,10 +623,10 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                         st.success("💖 ส่งจดหมายสำเร็จแล้ว!")
 
 # ==========================================
-# ⚙️ ระบบหลังบ้านจัดการข้อมูล
+# ⚙️ SYSTEM
 # ==========================================
-elif view_mode == "⚙️ ระบบหลังบ้าน":
-    st.subheader("⚙️ ระบบจัดการข้อมูลหลังบ้าน")
+elif view_mode == "⚙️ SYSTEM":
+    st.subheader("⚙️ SYSTEM")
     password_input = st.text_input("กรุณาป้อนรหัสผ่านผู้ดูแลระบบ:", type="password")
     
     if password_input == ADMIN_PASSWORD:
@@ -637,7 +637,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
         if "edit_gift_index" not in st.session_state: st.session_state.edit_gift_index = None
         if "edit_event_index" not in st.session_state: st.session_state.edit_event_index = None
 
-        with st.expander("🛠️ จัดการโครงสร้างแท็บเมนูด้านบน และเพิ่ม/ลดแท็บอิสระ"):
+        with st.expander("🛠️ จัดการโครงสร้างแท็บเมนูด้านบน "):
             st.markdown("### 📋 รายการแท็บปัจจุบันที่มีอยู่บนหน้าหลัก")
             updated_tabs = []
             for t_idx, t_item in enumerate(sys_config.get("tabs", [])):
@@ -678,10 +678,10 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     "ระบุประเภทข้อมูลที่จะนำมาแสดงในแท็บนี้:",
                     [
                         ("home_dashboard", "แดชบอร์ดหน้าแรก (มีประกาศ เพลงโฟกัส คลังภาพแนะนำ และวิดีโอแนะนำ)"),
-                        ("artist_events_all", "🗓️ คลังตารางงานศิลปินทั้งหมด (แยกออกมาเฉพาะเจาะจง)"),
-                        ("all_videos", "หน้าคลังรวมวิดีโอทุกหมวดหมู่แยกชั้น"),
+                        ("artist_events_all", "🗓️ ตารางงานศิลปินทั้งหมด"),
+                        ("all_videos", "หน้าคลังรวมวิดีโอทุกหมวดหมู่"),
                         ("single_shelf_only", "ดึงเฉพาะวิดีโอหมวดหมู่ใดหมวดหมู่หนึ่งมาโชว์"),
-                        ("digital_goods", "คลังโหลดรูปภาพ Digital Goods"),
+                        ("digital_goods", "โหลดรูปภาพ Digital Goods"),
                         ("fan_letters", "กล่องข้อความ / ส่งจดหมาย")
                     ],
                     format_func=lambda x: x[1]
@@ -701,7 +701,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     st.rerun()
 
             st.markdown("---")
-            st.markdown("### 📂 จัดการรายชื่อหมวดหมู่ประเภทวิดีโอ (Video Shelves)")
+            st.markdown("### 📂 จัดการหมวดหมู่ประ/เภทวิดีโอ (Video Shelves)")
             with st.form(key="add_shelf_form_new"):
                 new_type_id = st.text_input("รหัสหมวดหมู่ (ภาษาอังกฤษ ห้ามซ้ำ เช่น Vlog):")
                 new_type_title = st.text_input("ชื่อป้ายหมวดหมู่แสดงผลบนเว็บ (เช่น 📸 วล็อก):")
@@ -724,13 +724,13 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     st.success("ลบหมวดหมู่สำเร็จ!")
                     st.rerun()
 
-        with st.expander("🎯 1. ตั้งค่าเพลงโปรเจกต์โฟกัส"):
+        with st.expander("🎯 1. ตั้งค่า PROJECT FOCUS"):
             curr_mv = load_mv_highlight()
             with st.form(key="mv_form_exp"):
                 mv_title_in = st.text_input("ชื่อเพลง:", value=curr_mv['title'])
                 mv_url_in = st.text_input("ลิงก์ YouTube MV:", value=curr_mv['url'])
                 mv_target_in = st.number_input("เป้าหมายยอดวิว:", value=int(curr_mv['target_views']), step=10000)
-                mv_current_in = st.number_input("บังคับค่ายอดวิวเริ่มต้นชั่วคราว:", value=int(curr_mv['current_views']))
+                mv_current_in = st.number_input("ยอดวิวปัจจุบัน:", value=int(curr_mv['current_views']))
                 mv_submit = st.form_submit_button("💾 บันทึก")
             if mv_submit:
                 save_mv_highlight(mv_url_in, mv_current_in, mv_target_in, mv_title_in)
@@ -743,7 +743,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 save_important_info(new_info_text)
                 st.success("อัปเดตประกาศสำเร็จ!"); st.rerun()
 
-        with st.expander("🎨 3. จัดการ Digital goods (แก้ไข/ปักหมุด/ลบ)"):
+        with st.expander("🎨 3. จัดการ Digital goods "):
             gifts_data = load_gifts()
             col_g1, col_g2 = st.columns([1, 1.2])
             with col_g1:
@@ -752,15 +752,15 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     default_g_title, default_g_down = curr_gift['title'], curr_gift['download_url']
                     default_g_desc = curr_gift.get('description', '')
                     default_g_pin = bool(curr_gift.get('pinned', False))
-                    gift_btn_txt = "🔄 อัปเดตข้อมูลของแจก"
+                    gift_btn_txt = "🔄 อัปเดตข้อมูล Digital goods"
                 else:
                     default_g_title, default_g_down, default_g_desc, default_g_pin = "", "", "", False
                     gift_btn_txt = "🚀 อัปโหลดขึ้นหน้าแรก"
                 with st.form(key="add_gift_exp_v8"):
-                    g_title = st.text_input("ชื่อของแจก:", value=default_g_title)
+                    g_title = st.text_input("ชื่อ Goods:", value=default_g_title)
                     g_desc = st.text_area("รายละเอียด / คำอธิบาย:", value=default_g_desc, help="รายละเอียดสั้นๆ เกี่ยวกับไฟล์นี้")
-                    uploaded_img_file = st.file_uploader("เลือกรูปภาพตัวอย่างใหม่:", type=["png", "jpg", "jpeg"])
-                    g_down_url = st.text_input("ลิงก์ดาวน์โหลดรูปเต็ม:", value=default_g_down)
+                    uploaded_img_file = st.file_uploader("เลือกรูปภาพตัวอย่าง:", type=["png", "jpg", "jpeg"])
+                    g_down_url = st.text_input("ลิงก์ดาวน์โหลดรูป:", value=default_g_down)
                     g_is_pinned = st.checkbox("📌 ปักหมุดในโซนแนะนำ", value=default_g_pin)
                     gift_submit = st.form_submit_button(gift_btn_txt)
                 if gift_submit and g_title and g_down_url:
@@ -792,7 +792,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if g_c3.button("📝", key=f"edit_g_{g_i}"): st.session_state.edit_gift_index = g_i; st.rerun()
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
-        with st.expander("🗓️ จัดการตารางงานศิลปิน (เพิ่ม/แก้ไข/ลบตารางงานปัจจุบัน)"):
+        with st.expander("🗓️ จัดการตารางงานศิลปิน "):
             current_events_list = load_event_schedules()
             
             if st.session_state.edit_event_index is not None:
@@ -867,9 +867,9 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                             st.success("ลบรายการสำเร็จ!")
                             st.rerun()
 
-        with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
+        with st.expander("🎬 4. จัดการวิดีโอทั้วไป"):
             st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
-            yt_fetch_link = st.text_input("วางลิงก์ YouTube ตรงนี้เพื่อดึงข้อมูลอัตโนมัติ:", key="yt_fetch_link_input_v2")
+            yt_fetch_link = st.text_input("วางลิงก์ YouTube ดึงข้อมูลอัตโนมัติ:", key="yt_fetch_link_input_v2")
             if st.button("🔍 ดึงชื่อคลิป ชื่อช่อง และวันที่ออนแอร์", key="btn_fetch_yt_v2"):
                 if yt_fetch_link.strip():
                     with st.spinner("กำลังแกะข้อมูลจากหลังบ้าน YouTube..."):
@@ -878,7 +878,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         st.session_state["fetched_channel_val_v2"] = fetched_channel
                         st.session_state["fetched_date_val_v2"] = fetched_date
                         st.session_state["fetched_link_val_v2"] = yt_fetch_link
-                        st.success("ดึงข้อมูลสำเร็จ! ข้อมูลถูกนำไปหยอดในช่องกรอกด้านล่างแล้ว")
+                        st.success("ดึงข้อมูลสำเร็จ! ข้อมูลถูกนำไปใช้ในช่องกรอกด้านล่างแล้ว")
                         st.rerun()
 
             st.markdown("---")
@@ -958,7 +958,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                         save_data(st.session_state.schedules)
                         st.rerun()
 
-        with st.expander("📬 5. เปิดกล่องอ่านจดหมายลับจากแฟนคลับ (Fan Letters)"):
+        with st.expander("📬 5. เปิดกล่องอ่านจดหมาย (Fan Letters)"):
             messages_list = load_messages()
             if not messages_list: st.info("กล่องจดหมายว่างอยู่")
             else:
