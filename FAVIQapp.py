@@ -67,7 +67,6 @@ def load_event_schedules():
     if os.path.exists(EVENT_SCHEDULE_FILE):
         try:
             df = pd.read_csv(EVENT_SCHEDULE_FILE)
-            # แปลงเป็น datetime ชั่วคราวเพื่อทำการจัดเรียงวันที่จากปัจจุบันไปอนาคตอย่างถูกต้อง
             df['date_parsed'] = pd.to_datetime(df['วันที่'], errors='coerce')
             df = df.sort_values(by='date_parsed', ascending=True)
             df = df.drop(columns=['date_parsed'])
@@ -84,13 +83,27 @@ def extract_only_day_num(date_str):
     if not date_str or pd.isna(date_str):
         return "-"
     try:
-        # แยกชิ้นส่วนจาก 2026-07-27 ให้เหลือแค่ 27
         parts = str(date_str).split('-')
         if len(parts) == 3:
-            return str(int(parts[2])) # int ช่วยตัดเลข 0 ข้างหน้าออก เช่น 02 -> 2
+            return str(int(parts[2])) 
         return str(date_str)
     except:
         return str(date_str)
+
+# ฟังก์ชันแปลง วันที่มาตรฐาน เป็นชื่อเดือนภาษาไทย + ปี พ.ศ. สำหรับทำหัวข้อจัดหมวดหมู่
+def get_thai_month_year(date_str):
+    if not date_str or pd.isna(date_str):
+        return "ไม่ระบุเดือน"
+    months_th = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
+    try:
+        parts = str(date_str).split('-')
+        if len(parts) == 3:
+            year = int(parts[0]) + 543 # เปลี่ยนเป็น พ.ศ.
+            month = int(parts[1])
+            return f"{months_th[month]} {year}"
+    except:
+        pass
+    return "ไม่ระบุเดือน"
 
 # --- ฟังก์ชันระบบช่วยดึงข้อมูล ---
 def extract_youtube_id(url):
@@ -235,7 +248,7 @@ def save_important_info(text):
 
 if "schedules" not in st.session_state: st.session_state.schedules = load_data()
 
-# --- ตกแต่ง CSS หน้าเว็บสไตล์ YouTube ---
+# --- ตกแต่ง CSS หน้าเว็บสไตล์ YouTube (เพิ่มคลาสสำหรับงานสีเทาหม่น Past Event) ---
 st.markdown(
     """
     <style>
@@ -254,7 +267,7 @@ st.markdown(
     .yt-video-channel { font-size: 12px; color: #ef4444; font-weight: 500; margin-bottom: 2px; }
     .yt-video-meta { font-size: 12px; color: #94a3b8; }
     
-    /* สไตล์การ์ดตารางงาน */
+    /* สไตล์การ์ดตารางงานปกติ */
     .schedule-item-box { display: flex; align-items: center; background-color: #0d1321; border-radius: 12px; padding: 15px; margin-bottom: 15px; border: 1px solid #1e293b; }
     .schedule-date-badge { flex-shrink: 0; width: 75px; height: 75px; background-color: #facc15; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: #000; box-shadow: 0 4px 10px rgba(250, 204, 21, 0.2); margin-right: 18px; text-align: center; line-height: 1; }
     .schedule-content-info { flex-grow: 1; color: #f1f5f9; }
@@ -264,13 +277,18 @@ st.markdown(
     .schedule-indent-text { padding-left: 20px; color: #f1f5f9; font-weight: 500; word-break: break-all; }
     .schedule-note-text { font-size: 12px; color: #94a3b8; font-style: italic; margin-top: 6px; }
 
+    /* สไตล์การ์ดตารางงานที่ผ่านมาแล้ว (สีเทาหม่น) */
+    .schedule-item-box.past-event { background-color: #1a1f2c; opacity: 0.6; border: 1px solid #334155; }
+    .schedule-date-badge.past-badge { background-color: #64748b; color: #e2e8f0; box-shadow: none; }
+    .schedule-title-text.past-title { color: #94a3b8; text-decoration: line-through; }
+
     .gift-card { background-color: #0f172a; border: 1px solid #334155; border-radius: 14px; padding: 12px; text-align: center; margin-bottom: 15px; }
     .gift-img-container { width: 100%; height: 160px; overflow: hidden; border-radius: 10px; background-color: #020617; margin-bottom: 8px; }
     .gift-img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
     
     .download-btn { display: block; background-color: #ef4444; color: white !important; padding: 6px 10px; font-size: 12px; font-weight: bold; border-radius: 10px; text-decoration: none !important; text-align: center; margin-top: 5px; }
     .yt-shelf-title { font-size: 18px; font-weight: bold; color: #f8fafc; margin: 20px 0 15px 0; display: flex; align-items: center; gap: 8px; }
-    .yt-play-all { font-size: 14px; color: #94a3b8; font-weight: normal; cursor: pointer; text-decoration: none; }
+    .month-group-title { font-size: 16px; font-weight: bold; color: #38bdf8; background-color: #1e293b; padding: 6px 14px; border-radius: 8px; margin: 15px 0 10px 0; display: inline-block; }
     .letter-card { background-color: #1e293b; border-left: 4px solid #ef4444; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
     
     .stTabs [data-baseweb="tab-list"] { gap: 24px; border-bottom: 1px solid #2d3748; }
@@ -384,12 +402,23 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                             st.info("ยังไม่มีคลิปปักหมุดในขณะนี้")
                             
                     with col_dashboard_right:
-                        st.markdown('<div class="yt-shelf-title">📅 ตารางงานศิลปิน (3 วันล่าสุด)</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="yt-shelf-title">📅 ตารางงานศิลปิน (เฉพาะงานที่กำลังจะถึง)</div>', unsafe_allow_html=True)
                         event_list = load_event_schedules()
-                        if event_list:
-                            upcoming_events = event_list[:3]
-                            for ev in upcoming_events:
-                                # 💡 ดึงเฉพาะตัวเลขวันที่เดี่ยวๆ ไปแสดงผลตามโจทย์ป้าย Badge ลบปัญหาเลขเบิ้ล
+                        today = datetime.date.today()
+                        
+                        # 💡 แก้ไขจุดที่ 1: กรอง "ซ่อนงานที่วันที่เลยมาแล้ว" ออกไปจากหน้าแรกทันที
+                        upcoming_events = []
+                        for ev in event_list:
+                            try:
+                                ev_date_obj = datetime.datetime.strptime(ev.get('วันที่', ''), "%Y-%m-%d").date()
+                                if ev_date_obj >= today:
+                                    upcoming_events.append(ev)
+                            except:
+                                upcoming_events.append(ev) # ถ้าอ่านฟอร์แมตไม่ได้ให้ติดไว้ก่อนกันข้อมูลหลุด
+                                
+                        if upcoming_events:
+                            # โชว์เฉพาะ 3 อันแรกสุดที่เป็นอนาคต
+                            for ev in upcoming_events[:3]:
                                 display_day = extract_only_day_num(ev.get('วันที่', '-'))
                                 note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
                                 st.markdown(f"""
@@ -407,7 +436,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </div>
                                 """, unsafe_allow_html=True)
                         else:
-                            st.info("ยังไม่มีข้อมูลตารางงานในระบบ สามารถเพิ่มข้อมูลได้ผ่านระบบหลังบ้าน")
+                            st.info("ไม่มีงานใหม่ที่กำลังจะถึงในระยะนี้")
 
                     st.markdown("---")
 
@@ -522,28 +551,60 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </a>
                                 """, unsafe_allow_html=True)
 
+                # ==========================================================
+                # 🗓️ แก้ไขจุดที่ 2 และ 3: เปลี่ยนอดีตเป็นสีเทา + จัดหมวดหมู่รายเดือน
+                # ==========================================================
                 elif t_type == "artist_events_all":
                     st.markdown('<div class="yt-shelf-title">🗓️ คลังข้อมูลตารางงานศิลปินทั้งหมด</div>', unsafe_allow_html=True)
                     event_list = load_event_schedules()
+                    today = datetime.date.today()
+                    
                     if not event_list:
                         st.info("ขณะนี้ไม่มีข้อมูลตารางงานในระบบ")
                     else:
+                        # แยกกลุ่มข้อมูลออกเป็นกลุ่มรายเดือนตามความต้องการ
+                        events_by_month = {}
                         for ev in event_list:
-                            display_day = extract_only_day_num(ev.get('วันที่', '-'))
-                            note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
-                            st.markdown(f"""
-                            <div class="schedule-item-box" style="margin-bottom: 20px;">
-                                <div class="schedule-date-badge" style="background-color: #3b82f6; color:#fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);">{display_day}</div>
-                                <div class="schedule-content-info">
-                                    <div class="schedule-title-text" style="color: #60a5fa; font-size: 19px;">{ev.get('รายการ', '-')}</div>
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-top: 8px;">
-                                        <div class="schedule-meta-row" style="font-size: 15px;">⏰ <b>เวลา:</b> {ev.get('เวลา', '-')}</div>
-                                        <div class="schedule-meta-row-two-lines" style="font-size: 15px;">📍 <b>สถานที่ / ช่องรับชม:</b> {ev.get('สถานที่/ช่อง', '-')}</div>
+                            month_key = get_thai_month_year(ev.get('วันที่', ''))
+                            if month_key not in events_by_month:
+                                events_by_month[month_key] = []
+                            events_by_month[month_key].append(ev)
+                        
+                        # วนลูปแสดงแยกทีละหมวดหมู่เดือน
+                        for month_name, items in events_by_month.items():
+                            st.markdown(f'<div class="month-group-title">📅 ประจำเดือน: {month_name}</div>', unsafe_allow_html=True)
+                            
+                            for ev in items:
+                                display_day = extract_only_day_num(ev.get('วันที่', '-'))
+                                note_snippet = f'<div class="schedule-note-text">*{ev.get("หมายเหตุ", "")}</div>' if ev.get("หมายเหตุ") else ''
+                                
+                                # ตรวจสอบว่าเป็นงานในอดีตหรือไม่ เพื่อสลับสไตล์สีเทา
+                                is_past = False
+                                try:
+                                    ev_date_obj = datetime.datetime.strptime(ev.get('วันที่', ''), "%Y-%m-%d").date()
+                                    if ev_date_obj < today:
+                                        is_past = True
+                                except:
+                                    pass
+                                
+                                # สลับ HTML Class ตามสถานะปัจจุบัน/อดีต
+                                box_class = "schedule-item-box past-event" if is_past else "schedule-item-box"
+                                badge_style = "background-color: #64748b; color:#fff; box-shadow: none;" if is_past else "background-color: #3b82f6; color:#fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);"
+                                title_style = "color: #94a3b8; font-size: 19px; text-decoration: line-through;" if is_past else "color: #60a5fa; font-size: 19px;"
+                                
+                                st.markdown(f"""
+                                <div class="{box_class}">
+                                    <div class="schedule-date-badge" style="{badge_style}">{display_day}</div>
+                                    <div class="schedule-content-info">
+                                        <div class="schedule-title-text" style="{title_style}">{ev.get('รายการ', '-')} {" (ผ่านไปแล้ว)" if is_past else ""}</div>
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-top: 8px;">
+                                            <div class="schedule-meta-row" style="font-size: 14px;">⏰ <b>เวลา:</b> {ev.get('เวลา', '-')}</div>
+                                            <div class="schedule-meta-row-two-lines" style="font-size: 14px;">📍 <b>สถานที่ / ช่องรับชม:</b> {ev.get('สถานที่/ช่อง', '-')}</div>
+                                        </div>
+                                        {note_snippet}
                                     </div>
-                                    {note_snippet}
-                                </div>
-                             </div>
-                            """, unsafe_allow_html=True)
+                                 </div>
+                                """, unsafe_allow_html=True)
 
                 elif t_type == "fan_letters":
                     with st.form(key=f"fan_msg_form_{index}", clear_on_submit=True):
@@ -709,16 +770,12 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     if g_c3.button("📝", key=f"edit_g_{g_i}"): st.session_state.edit_gift_index = g_i; st.rerun()
                     if g_c4.button("🗑️", key=f"del_g_{g_i}"): gifts_data.pop(g_i); save_gifts(gifts_data); st.rerun()
 
-        # =========================================================================
-        # 🗓️ ส่วนจัดการตารางงานศิลปิน (แก้ไขระบบ Input เป็นแบบปฏิทินกด)
-        # =========================================================================
         with st.expander("🗓️ จัดการตารางงานศิลปิน (เพิ่ม/แก้ไข/ลบตารางงานปัจจุบัน)"):
             current_events_list = load_event_schedules()
             
             if st.session_state.edit_event_index is not None:
                 st.markdown("### 📝 แก้ไขรายการตารางงาน")
                 ev_curr = current_events_list[st.session_state.edit_event_index]
-                # แปลงข้อความวันที่ใน CSV ให้กลับมาเป็น Object วันที่ของ Python เพื่อป้อนเข้าช่องปฏิทิน
                 try:
                     default_ev_date = datetime.datetime.strptime(str(ev_curr.get("วันที่", "")), "%Y-%m-%d").date()
                 except:
@@ -735,7 +792,6 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 event_btn_txt = "💾 บันทึกตารางงาน"
                 
             with st.form(key="add_event_schedule_form", clear_on_submit=False):
-                # 💡 เปลี่ยนจากช่องกรอกข้อความเป็น "ปฏิทินให้คลิกเลือกวัน" แม่นยำ ไร้กังวลเรื่องพิมพ์ผิดฟอร์แมต
                 ev_date = st.date_input("เลือกวันที่จัดงาน:", value=default_ev_date)
                 ev_title = st.text_input("รายการ / ชื่องาน:", value=default_ev_title)
                 ev_time = st.text_input("เวลา (เช่น 21:45 น. หรือ 15.30):", value=default_ev_time)
@@ -745,7 +801,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                 
                 if submit_event and ev_title.strip():
                     item_event_data = {
-                        "วันที่": str(ev_date), # เซฟลงไฟล์ CSV เป็นฟอร์แมตสากล YYYY-MM-DD เพื่อให้เอาไปเรียงลำดับวันง่ายๆ
+                        "วันที่": str(ev_date), 
                         "รายการ": clean_html_tags(ev_title),
                         "เวลา": clean_html_tags(ev_time),
                         "สถานที่/ช่อง": clean_html_tags(ev_location),
@@ -768,7 +824,7 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     st.rerun()
             
             st.markdown("---")
-            st.markdown("### 📋 ตารางงานทั้งหมดที่มีในระบบ (จัดเรียงวันอัตโนมัติแล้ว)")
+            st.markdown("### 📋 ตารางงานทั้งหมดที่มีในระบบ")
             if not current_events_list:
                 st.info("ขณะนี้ยังไม่มีรายการตารางงาน")
             else:
@@ -776,7 +832,8 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     col_ev_info, col_ev_actions = st.columns([3.5, 1.5])
                     with col_ev_info:
                         display_day = extract_only_day_num(ev_item.get('วันที่', '-'))
-                        st.write(f"**[{display_day}] {ev_item.get('รายการ', '-')}** \n<br><span style='color:#facc15; font-size:12px;'>📅 วันที่เต็ม: {ev_item.get('วันที่', '-')} | ⏰ เวลา: {ev_item.get('เวลา', '-')} | 📍 สถานที่/ช่อง: {ev_item.get('สถานที่/ช่อง', '-')} | 💬 หมายเหตุ: {ev_item.get('หมายเหตุ', '-')}</span>", unsafe_allow_html=True)
+                        m_group = get_thai_month_year(ev_item.get('วันที่', ''))
+                        st.write(f"**[{display_day}] {ev_item.get('รายการ', '-')}** \n<br><span style='color:#facc15; font-size:12px;'>📁 กลุ่มเดือน: {m_group} | 📅 วันที่: {ev_item.get('วันที่', '-')} | ⏰ เวลา: {ev_item.get('เวลา', '-')}</span>", unsafe_allow_html=True)
                     with col_ev_actions:
                         act_c1, act_c2 = st.columns(2)
                         if act_c1.button("📝 แก้ไข", key=f"edit_ev_btn_{ev_idx}"):
@@ -788,23 +845,17 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                             st.success("ลบรายการสำเร็จ!")
                             st.rerun()
 
-        # =========================================================================
-        # 🎬 4. ส่วนจัดระเบียบวิดีโอ
-        # =========================================================================
         with st.expander("🎬 4. จัดการคลังผลงานวิดีโอและคิวงานทั่วไป"):
             st.markdown("**⚡ เครื่องมือช่วยดึงข้อมูลด่วนจากลิงก์ YouTube**")
-            
             yt_fetch_link = st.text_input("วางลิงก์ YouTube ตรงนี้เพื่อดึงข้อมูลอัตโนมัติ:", key="yt_fetch_link_input_v2")
             if st.button("🔍 ดึงชื่อคลิป ชื่อช่อง และวันที่ออนแอร์", key="btn_fetch_yt_v2"):
                 if yt_fetch_link.strip():
                     with st.spinner("กำลังแกะข้อมูลจากหลังบ้าน YouTube..."):
                         fetched_title, fetched_channel, fetched_date = fetch_youtube_details(yt_fetch_link)
-                        
                         st.session_state["fetched_title_val_v2"] = fetched_title
                         st.session_state["fetched_channel_val_v2"] = fetched_channel
                         st.session_state["fetched_date_val_v2"] = fetched_date
                         st.session_state["fetched_link_val_v2"] = yt_fetch_link
-                        
                         st.success("ดึงข้อมูลสำเร็จ! ข้อมูลถูกนำไปหยอดในช่องกรอกด้านล่างแล้ว")
                         st.rerun()
 
