@@ -124,7 +124,7 @@ def load_mv_highlight():
             df = pd.read_csv(MV_FILE)
             data = df.to_dict('records')[0]
             current_time = time.time()
-            if (current_time - float(data.get('last_updated', 0.0))) >= 3600:
+            if (current_time - float(data.get('last_updated', 0.0))) >= 600:
                 v_id = extract_youtube_id(data['url'])
                 fresh = fetch_live_youtube_views(v_id) if v_id else None
                 if fresh:
