@@ -234,7 +234,7 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
         c_views, t_views = int(mv_data['current_views']), int(mv_data['target_views'])
         progress_ratio = min(float(c_views / t_views), 1.0) if t_views > 0 else 0.0
         
-        # FIX: แก้ไขเพื่อให้ตัวหนังสือยอดวิวและเป้าหมายอยู่ข้างกันอย่างถูกต้องในระนาบเดียวกัน
+        # ปรับแก้ให้ข้อมูลตัวหนังสือวิวและเป้าหมายขึ้นแสดงอยู่ระนาบเดียวกันข้างกัน
         col_c, col_t = st.columns(2)
         col_c.metric(label="📈 ยอดวิวบน YouTube", value=f"{c_views:,} วิว")
         col_t.metric(label="🎯 เป้าหมาย", value=f"{t_views:,} วิว")
@@ -254,7 +254,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
     
     # ---- TAB 1: หน้าแรก ----
     with tab_home:
-        # โซนปักหมุดแนะนำพิเศษ (Pinned Highlights)
         pinned_gifts = [g for g in gifts_list if g.get('pinned', False)]
         pinned_vids = [v for v in all_vids if v.get('pinned', False)]
         
@@ -303,7 +302,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                     """, unsafe_allow_html=True)
 
         if not df_vids.empty:
-            # หน้าแรก default เรียงจากใหม่ไปเก่า
             df_vids_home = df_vids.sort_values(by='date', ascending=False)
             homepage_shelves = [
                 {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
@@ -311,33 +309,37 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
             ]
             for shelf in homepage_shelves:
                 df_shelf = df_vids_home[df_vids_home['type'] == shelf['type']]
-                # แทนที่โค้ดเดิมในโซนแสดงผลชั้นวางปกติ 2 หมวดหมู่ตัวอย่างในหน้าแรก
-for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
-    with v_cols[v_idx % 4]:
-        thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
-        click_url = v_item['link'] if v_item['link'] and not pd.isna(v_item['link']) else "#"
-        
-        # ปรับตรงนี้: ถักแท็กปิดการ์ด </ins></ins> เข้าไปอยู่ในเงื่อนไขให้จบในตัว
-        if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])):
-            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div></div></div>'
-        else:
-            note_html = '</div></div>'
-        
-        st.markdown(f"""
-        <a href="{click_url}" target="_blank" class="yt-video-card-link">
-            <div class="yt-video-card">
-                <div class="yt-thumbnail-container">
-                    <img class="yt-thumbnail-img" src="{thumb}">
-                </div>
-                <div class="yt-video-details">
-                    <div class="yt-video-title">{v_item["title"]}</div>
-                    <div class="yt-video-channel">Official Channel</div>
-                    <div class="yt-video-meta">📅 {v_item["date"]}</div>
-                    {note_html}
-        </a>
-        """, unsafe_allow_html=True)
+                if not df_shelf.empty:
+                    st.markdown(f'<div class="yt-shelf-title">{shelf["title"]} <span class="yt-play-all">▶ เล่นทั้งหมด</span></div>', unsafe_allow_html=True)
+                    v_cols = st.columns(4)
+                    for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
+                        with v_cols[v_idx % 4]:
+                            thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
+                            click_url = v_item['link'] if v_item['link'] and not pd.isna(v_item['link']) else "#"
+                            
+                            # แก้ไขจุดที่ไม่มีข้อความโน้ตย่อ เพื่อไม่ให้แสดงแท็กหลุดตกค้าง (ตามรูป image_1bfa24.png)
+                            if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])):
+                                note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>'
+                            else:
+                                note_html = ''
+                            
+                            st.markdown(f"""
+                            <a href="{click_url}" target="_blank" class="yt-video-card-link">
+                                <div class="yt-video-card">
+                                    <div class="yt-thumbnail-container">
+                                        <img class="yt-thumbnail-img" src="{thumb}">
+                                    </div>
+                                    <div class="yt-video-details">
+                                        <div class="yt-video-title">{v_item["title"]}</div>
+                                        <div class="yt-video-channel">Official Channel</div>
+                                        <div class="yt-video-meta">📅 {v_item["date"]}</div>
+                                        {note_html}
+                                    </div>
+                                </div>
+                            </a>
+                            """, unsafe_allow_html=True)
 
-    # ---- TAB 2: วิดีโอทั้งหมด (แยกหมวดหมู่จัดเต็ม + ระบบเรียงลำดับตามใจชอบ) ----
+    # ---- TAB 2: วิดีโอทั้งหมด (จัดเรียงสถิติแยกตามคนดูเลือก) ----
     with tab_videos:
         video_shelves = [
             {"type": "Variety / TV", "title": "📺 รายการโทรทัศน์ / Variety & TV Shows"},
@@ -351,7 +353,6 @@ for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
             with col_title:
                 st.markdown(f'<div class="yt-shelf-title" style="margin-bottom:0px;">{shelf["title"]}</div>', unsafe_allow_html=True)
             with col_sort:
-                # NEW: เพิ่มตัวเลือกการจัดเรียงแยกตามแต่ละหมวดหมู่
                 sort_order = st.selectbox(
                     "เรียงลำดับ:", 
                     ["ใหม่ล่าสุด", "เก่าที่สุด"], 
@@ -365,7 +366,6 @@ for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
                 if df_shelf.empty: 
                     st.caption("ยังไม่มีวิดีโอในหมวดหมู่นี้")
                 else:
-                    # จัดเรียงตามเงื่อนไขที่คนดูเลือก
                     is_ascending = True if sort_order == "เก่าที่สุด" else False
                     df_shelf = df_shelf.sort_values(by='date', ascending=is_ascending)
                     
@@ -379,7 +379,11 @@ for v_idx, v_item in enumerate(df_shelf.to_dict('records')[:4]):
                         with v_cols[v_idx % 4]:
                             thumb = get_youtube_thumbnail(v_item['link']) or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=500"
                             click_url = v_item['link'] if v_item['link'] and not pd.isna(v_item['link']) else "#"
-                            note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>' if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])) else ''
+                            
+                            if ('note' in v_item and v_item['note'] and not pd.isna(v_item['note'])):
+                                note_html = f'<div style="font-size:11px; color:#94a3b8; font-style:italic;">💬 {v_item["note"]}</div>'
+                            else:
+                                note_html = ''
                             
                             st.markdown(f"""
                             <a href="{click_url}" target="_blank" class="yt-video-card-link">
