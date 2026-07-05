@@ -694,12 +694,13 @@ elif view_mode == "⚙️ ระบบหลังบ้าน":
                     d_note, d_pinned, d_type_idx = "", False, 0
                     btn_txt = "🚀 อัปโหลดเข้าคลัง"
                 
-                with st.form(key='admin_vid_form_v9'):
-                    title = st.text_input("ชื่อคลิป:", value=d_title)
-                    channel = st.text_input("ชื่อช่องต้นทาง:", value=d_channel)
-                    date_val = st.date_input("วันที่ออนแอร์:", value=d_date)
+                # 🛠️ เปลี่ยนคีย์ของฟอร์มเป็น v10 เพื่อไม่ให้ซ้ำกับของเดิมระบบ
+                with st.form(key='admin_vid_form_v10'):
+                    title = st.text_input("ชื่อคลิป:", key="vid_title_key")
+                    channel = st.text_input("ชื่อช่องต้นทาง:", key="vid_channel_key")
+                    date_val = st.date_input("วันที่ออนแอร์:", key="vid_date_key")
                     w_type = st.selectbox("ประเภท:", available_options, index=d_type_idx)
-                    link = st.text_input("ลิงก์คลิป:", value=d_link)
+                    link = st.text_input("ลิงก์คลิป:", key="vid_link_key")
                     note = st.text_area("โน้ตย่อ:", value=d_note)
                     is_pinned = st.checkbox("📌 ปักหมุดคลิปนี้ในโซนวิดีโอแนะนำหน้าแรก", value=d_pinned)
                     vid_submit = st.form_submit_button(btn_txt)
