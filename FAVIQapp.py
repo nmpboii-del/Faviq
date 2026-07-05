@@ -356,7 +356,6 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                                 </a>
                                 """, unsafe_allow_html=True)
                     
-                    # แก้ไขให้ดึงทุกหมวดหมู่มาวนลูปแสดงผลในหน้าแรก และซ่อนหมวดหมู่ที่ไม่มีคลิป พร้อมระบบดูเพิ่มเติมอิสระ
                     homepage_shelves = sys_config.get("video_shelves", [])
                     for shelf in homepage_shelves:
                         df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
@@ -393,11 +392,10 @@ if view_mode == "🏠 หน้าแรกแกลเลอรี":
                 elif t_type == "all_videos":
                     video_shelves = sys_config.get("video_shelves", [])
                     for shelf in video_shelves:
-                        st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
                         df_shelf = df_vids[df_vids['type'] == shelf['type']] if not df_vids.empty else pd.DataFrame()
-                        if df_shelf.empty:
-                            st.caption("ยังไม่มีวิดีโอในหมวดหมู่นี้")
-                        else:
+                        # ปรับปรุงตรงนี้: สำหรับแท็บ "วิดีโอทั้งหมด" จะเช็คว่าถ้าไม่มีคลิปในหมวดนี้ จะข้ามไปเลย ไม่เอามาแสดงผล
+                        if not df_shelf.empty:
+                            st.markdown(f'<div class="yt-shelf-title">{shelf["title"]}</div>', unsafe_allow_html=True)
                             shelf_records = df_shelf.to_dict('records')
                             s_key = f"sh_all_{shelf['type'].replace(' ', '_').replace('/', '_')}"
                             if s_key not in st.session_state: st.session_state[s_key] = False
